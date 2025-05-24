@@ -86,6 +86,21 @@ services:
     networks:
       - distributed-network
 
+  # Jaeger 分布式链路追踪
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: distributed-service-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # Jaeger HTTP collector
+      - "4317:4317"    # OTLP gRPC receiver
+      - "4318:4318"    # OTLP HTTP receiver
+    networks:
+      - distributed-network
+
   # Prometheus 监控
   prometheus:
     image: prom/prometheus:v2.45.0
@@ -140,8 +155,11 @@ services:
         condition: service_healthy
       consul:
         condition: service_healthy
+      jaeger:
+        condition: service_started
     environment:
       - ENV=production
+      - NAME=app
     networks:
       - distributed-network
 

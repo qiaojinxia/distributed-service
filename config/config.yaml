@@ -3,6 +3,7 @@ server:
   mode: debug
   name: distributed-service
   version: v1.0.0
+  tags: "myapp,test-server"
 
 logger:
   level: debug
@@ -45,4 +46,13 @@ rabbitmq:
   port: 5672
   username: guest
   password: guest
-  vhost: / 
+  vhost: /
+
+tracing:
+  service_name: distributed-service
+  service_version: v1.0.0
+  environment: development
+  enabled: true
+  exporter_type: stdout  # 可选: "otlp", "stdout"
+  endpoint: "localhost:14268"  # Jaeger endpoint
+  sample_ratio: 1.0  # 1.0 表示采样所有请求，生产环境建议设为 0.1 或更小 

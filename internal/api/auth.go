@@ -6,6 +6,7 @@ import (
 	"distributed-service/internal/service"
 	"distributed-service/pkg/auth"
 	"distributed-service/pkg/logger"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -48,7 +49,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	user, err := h.userService.Register(ctx, &req)
 	if err != nil {
 		logger.Error(ctx, "Registration failed", logger.Error_(err))
-		if err == service.ErrUserExists {
+		if errors.Is(err, service.ErrUserExists) {
 			c.JSON(http.StatusConflict, ErrorResponse{Error: "User already exists"})
 		} else {
 			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
@@ -95,7 +96,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	user, err := h.userService.Login(ctx, &req)
 	if err != nil {
 		logger.Error(ctx, "Login failed", logger.Error_(err))
-		if err == service.ErrInvalidCredentials {
+		if errors.Is(err, service.ErrInvalidCredentials) {
 			c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "Invalid credentials"})
 		} else {
 			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
@@ -143,7 +144,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	newToken, err := h.jwtManager.RefreshToken(ctx, req.Token)
 	if err != nil {
 		logger.Error(ctx, "Failed to refresh token", logger.Error_(err))
-		if err == auth.ErrTokenExpired || err == auth.ErrInvalidToken {
+		if errors.Is(err, auth.ErrTokenExpired) || errors.Is(err, auth.ErrInvalidToken) {
 			c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "Invalid or expired token"})
 		} else {
 			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
@@ -200,7 +201,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	err := h.userService.ChangePassword(ctx, userID, req.OldPassword, req.NewPassword)
 	if err != nil {
 		logger.Error(ctx, "Failed to change password", logger.Error_(err))
-		if err == service.ErrInvalidPassword {
+		if errors.Is(err, service.ErrInvalidPassword) {
 			c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid old password"})
 		} else {
 			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})

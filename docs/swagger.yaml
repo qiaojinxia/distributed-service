@@ -283,6 +283,29 @@ paths:
       summary: Get user by ID
       tags:
       - users
+  /api/v1/users/me:
+    get:
+      description: Get the profile information of the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.User'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current user info
+      tags:
+      - users
 securityDefinitions:
   BearerAuth:
     description: Type "Bearer" followed by a space and JWT token.

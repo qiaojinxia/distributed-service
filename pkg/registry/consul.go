@@ -5,6 +5,8 @@ import (
 	"distributed-service/pkg/config"
 	"distributed-service/pkg/logger"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/hashicorp/consul/api"
 )
@@ -52,6 +54,17 @@ func NewServiceRegistry(ctx context.Context, cfg *config.ConsulConfig) (*Service
 	}, nil
 }
 
+// getServiceAddress 根据环境返回正确的服务地址
+func (sr *ServiceRegistry) getServiceAddress() string {
+	// 检查是否在 Docker 环境中
+	if os.Getenv("ENV") == "production" {
+		// 在 Docker 环境中，使用容器名称
+		return os.Getenv("NAME")
+	}
+	// 在本地开发环境中，使用 localhost
+	return "localhost"
+}
+
 func (sr *ServiceRegistry) RegisterService(ctx context.Context, serverCfg *config.ServerConfig) error {
 	logger.Info(ctx, "Registering service with Consul",
 		logger.String("service", serverCfg.Name),
@@ -59,16 +72,25 @@ func (sr *ServiceRegistry) RegisterService(ctx context.Context, serverCfg *confi
 		logger.Int("port", serverCfg.Port),
 	)
 
+	serviceAddress := sr.getServiceAddress()
+	healthCheckURL := fmt.Sprintf("http://%s:%d/health", serviceAddress, serverCfg.Port)
+
+	logger.Info(ctx, "Service registration details",
+		logger.String("address", serviceAddress),
+		logger.String("health_check_url", healthCheckURL),
+	)
+
 	registration := &api.AgentServiceRegistration{
 		ID:      fmt.Sprintf("%s-%s-%d", serverCfg.Name, serverCfg.Version, serverCfg.Port),
 		Name:    serverCfg.Name,
+		Tags:    append(strings.Split(serverCfg.Tags, ","), serverCfg.Version),
+		Address: serviceAddress,
 		Port:    serverCfg.Port,
-		Tags:    []string{serverCfg.Version},
-		Address: "localhost",
 		Check: &api.AgentServiceCheck{
-			HTTP:                           fmt.Sprintf("http://localhost:%d/health", serverCfg.Port),
-			Interval:                       sr.cfg.ServiceCheckInterval,
-			DeregisterCriticalServiceAfter: sr.cfg.DeregisterCriticalServiceAfter,
+			HTTP:                           healthCheckURL,                        // 动态生成检查端点
+			Interval:                       sr.cfg.ServiceCheckInterval,           // 检查间隔
+			Timeout:                        "2s",                                  // 检查超时时间
+			DeregisterCriticalServiceAfter: sr.cfg.DeregisterCriticalServiceAfter, // 失败后自动注销时间
 		},
 	}
 
@@ -83,6 +105,8 @@ func (sr *ServiceRegistry) RegisterService(ctx context.Context, serverCfg *confi
 	logger.Info(ctx, "Successfully registered service",
 		logger.String("service", serverCfg.Name),
 		logger.String("id", registration.ID),
+		logger.String("address", serviceAddress),
+		logger.String("health_check", healthCheckURL),
 	)
 
 	return nil

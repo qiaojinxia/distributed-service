@@ -93,6 +93,30 @@ func (h *UserHandler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// GetMe godoc
+// @Summary Get current user info
+// @Description Get the profile information of the authenticated user
+// @Tags users
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} model.User
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/v1/users/me [get]
+func (h *UserHandler) GetMe(c *gin.Context) {
+	ctx := c.MustGet("ctx").(context.Context)
+	userID := c.GetUint("user_id")
+
+	user, err := h.userService.GetByID(ctx, userID)
+	if err != nil {
+		logger.Error(ctx, "Failed to get current user", logger.Error_(err))
+		c.JSON(http.StatusNotFound, ErrorResponse{Error: "User not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
+}
+
 // ErrorResponse represents an error response
 type ErrorResponse struct {
 	Error string `json:"error"`

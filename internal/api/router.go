@@ -43,11 +43,11 @@ func RegisterRoutes(r *gin.Engine, userService service.UserService, jwtManager *
 	{
 		// Authentication routes (no auth required)
 		authHandler := NewAuthHandler(userService, jwtManager)
-		auth := v1.Group("/auth")
+		authBase := v1.Group("/auth")
 		{
-			auth.POST("/register", authHandler.Register)
-			auth.POST("/login", authHandler.Login)
-			auth.POST("/refresh", authHandler.RefreshToken)
+			authBase.POST("/register", authHandler.Register)
+			authBase.POST("/login", authHandler.Login)
+			authBase.POST("/refresh", authHandler.RefreshToken)
 		}
 
 		// Protected authentication routes
@@ -69,6 +69,7 @@ func RegisterRoutes(r *gin.Engine, userService service.UserService, jwtManager *
 		usersProtected := v1.Group("/users")
 		usersProtected.Use(middleware.JWTAuth(jwtManager))
 		{
+			usersProtected.GET("/me", userHandler.GetMe)      // Get current user info
 			usersProtected.POST("", userHandler.Create)       // Only authenticated users can create users
 			usersProtected.DELETE("/:id", userHandler.Delete) // Only authenticated users can delete users
 		}

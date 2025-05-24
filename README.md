@@ -1,6 +1,6 @@
 # 🚀 企业级分布式微服务框架
 
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org/)
+[![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat&logo=docker)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
@@ -45,7 +45,7 @@
 ### 📊 监控日志
 - **结构化日志** - 基于 Zap 的高性能日志
 - **指标收集** - HTTP、数据库、缓存指标
-- **分布式追踪** - 完整请求链路
+- **分布式追踪** - OpenTelemetry + Jaeger 完整请求链路追踪
 - **告警支持** - 集成 Prometheus AlertManager
 
 ## 🚀 快速开始
@@ -92,6 +92,7 @@ docker-compose logs -f app
 | 📖 API 文档 | http://localhost:8080/swagger/index.html | Swagger UI | - |
 | 🏥 健康检查 | http://localhost:8080/health | 服务状态 | - |
 | 📊 指标监控 | http://localhost:9090/metrics | Prometheus 指标 | - |
+| 🔍 链路追踪 | http://localhost:16686 | Jaeger UI | - |
 | 🗂️ 服务注册 | http://localhost:8500 | Consul UI | - |
 | 🐰 消息队列 | http://localhost:15672 | RabbitMQ 管理 | guest/guest |
 | 📈 监控系统 | http://localhost:9091 | Prometheus | - |
@@ -129,6 +130,43 @@ curl -X POST http://localhost:8080/api/v1/auth/change-password \
   -d '{"old_password":"password123","new_password":"newpassword456"}'
 ```
 
+## 🔍 分布式追踪测试
+
+### 自动化测试脚本
+```bash
+# 运行完整的追踪测试
+./scripts/test-tracing.sh
+```
+
+### 手动测试追踪功能
+```bash
+# 1. 注册用户（会产生追踪数据）
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -H 'X-Request-ID: trace-test-register' \
+  -d '{"username":"traceuser","email":"trace@example.com","password":"password123"}'
+
+# 2. 登录用户（会产生追踪数据）
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -H 'X-Request-ID: trace-test-login' \
+  -d '{"username":"traceuser","password":"password123"}'
+```
+
+### 查看追踪数据
+1. 访问 Jaeger UI: http://localhost:16686
+2. 在 Service 下拉框选择 `distributed-service`
+3. 点击 "Find Traces" 查看追踪链路
+4. 点击具体 trace 查看详细的 span 信息
+
+### 追踪数据包含
+- **HTTP 请求层**: 请求方法、路径、状态码、响应时间
+- **Service 业务层**: 用户操作、业务逻辑执行时间
+- **Repository 数据层**: 数据库操作、SQL 执行时间
+- **错误追踪**: 异常信息和错误堆栈
+
+📖 **详细文档**: [分布式追踪使用指南](TRACING.md)
+
 ## 📁 项目结构
 
 ```
@@ -146,9 +184,11 @@ distributed-service/
 │       └── prometheus.yml        # 监控配置
 ├── 🗄️ 数据库脚本
 │   └── scripts/
-│       └── mysql-init.sql        # 数据库初始化
+│       ├── mysql-init.sql        # 数据库初始化
+│       └── test-tracing.sh       # 分布式追踪测试脚本
 ├── 📚 API 文档
 │   └── docs/                     # Swagger 生成文档
+│       └── TRACING.md            # 分布式追踪使用指南
 ├── 🏗️ 应用代码
 │   ├── internal/                 # 内部业务逻辑
 │   │   ├── api/                  # HTTP 处理层
@@ -170,7 +210,8 @@ distributed-service/
 │       ├── metrics/              # 指标收集
 │       ├── auth/                 # 认证组件
 │       ├── mq/                   # 消息队列
-│       └── registry/             # 服务注册
+│       ├── registry/             # 服务注册
+│       └── tracing/              # 分布式链路追踪
 ├── go.mod                        # Go 模块依赖
 ├── go.sum                        # 依赖校验文件
 ├── main.go                       # 应用入口

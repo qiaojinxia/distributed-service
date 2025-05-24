@@ -15,6 +15,7 @@ type Config struct {
 	MySQL    MySQLConfig    `mapstructure:"mysql"`
 	Redis    RedisConfig    `mapstructure:"redis"`
 	RabbitMQ RabbitMQConfig `mapstructure:"rabbitmq"`
+	Tracing  TracingConfig  `mapstructure:"tracing"`
 }
 
 type ServerConfig struct {
@@ -22,6 +23,7 @@ type ServerConfig struct {
 	Mode    string `mapstructure:"mode"`
 	Name    string `mapstructure:"name"`
 	Version string `mapstructure:"version"`
+	Tags    string `mapstructure:"tags"`
 }
 
 type LoggerConfig struct {
@@ -72,6 +74,16 @@ type RabbitMQConfig struct {
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
 	VHost    string `mapstructure:"vhost"`
+}
+
+type TracingConfig struct {
+	ServiceName    string  `mapstructure:"service_name"`
+	ServiceVersion string  `mapstructure:"service_version"`
+	Environment    string  `mapstructure:"environment"`
+	Enabled        bool    `mapstructure:"enabled"`
+	ExporterType   string  `mapstructure:"exporter_type"` // "otlp", "stdout", "jaeger"
+	Endpoint       string  `mapstructure:"endpoint"`
+	SampleRatio    float64 `mapstructure:"sample_ratio"`
 }
 
 var GlobalConfig Config

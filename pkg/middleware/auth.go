@@ -4,6 +4,7 @@ import (
 	"context"
 	"distributed-service/pkg/auth"
 	"distributed-service/pkg/logger"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -45,7 +46,7 @@ func JWTAuth(jwtManager *auth.JWTManager) gin.HandlerFunc {
 		claims, err := jwtManager.ValidateToken(ctx, tokenString)
 		if err != nil {
 			logger.Error(ctx, "Token validation failed", logger.Error_(err))
-			if err == auth.ErrTokenExpired {
+			if errors.Is(err, auth.ErrTokenExpired) {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "Token expired"})
 			} else {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})

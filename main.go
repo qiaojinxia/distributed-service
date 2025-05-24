@@ -13,6 +13,8 @@ import (
 	"distributed-service/pkg/middleware"
 	"distributed-service/pkg/mq"
 	"distributed-service/pkg/registry"
+	"distributed-service/pkg/tracing"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -54,6 +56,27 @@ func main() {
 		fmt.Printf("Failed to initialize logger: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Initialize tracing
+	tracingConfig := &tracing.Config{
+		ServiceName:    config.GlobalConfig.Tracing.ServiceName,
+		ServiceVersion: config.GlobalConfig.Tracing.ServiceVersion,
+		Environment:    config.GlobalConfig.Tracing.Environment,
+		Enabled:        config.GlobalConfig.Tracing.Enabled,
+		ExporterType:   config.GlobalConfig.Tracing.ExporterType,
+		Endpoint:       config.GlobalConfig.Tracing.Endpoint,
+		SampleRatio:    config.GlobalConfig.Tracing.SampleRatio,
+	}
+
+	tracingManager, err := tracing.NewTracingManager(ctx, tracingConfig)
+	if err != nil {
+		logger.Fatal(ctx, "Failed to initialize tracing", logger.Error_(err))
+	}
+	defer func() {
+		if err := tracingManager.Shutdown(ctx); err != nil {
+			logger.Error(ctx, "Failed to shutdown tracing", logger.Error_(err))
+		}
+	}()
 
 	// Add service info to context
 	ctx = context.WithValue(ctx, "service_name", config.GlobalConfig.Server.Name)
@@ -119,6 +142,12 @@ func main() {
 		c.Next()
 	})
 
+	// Add tracing middleware
+	if config.GlobalConfig.Tracing.Enabled {
+		r.Use(middleware.TracingMiddleware(config.GlobalConfig.Tracing.ServiceName))
+		r.Use(middleware.CustomTracingMiddleware())
+	}
+
 	// Add metrics middleware
 	r.Use(middleware.MetricsMiddleware())
 
@@ -137,7 +166,7 @@ func main() {
 				Addr:    fmt.Sprintf(":%d", config.GlobalConfig.Metrics.PrometheusPort),
 				Handler: promhttp.Handler(),
 			}
-			if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				logger.Error(ctx, "Metrics server error", logger.Error_(err))
 			}
 		}()
@@ -156,7 +185,7 @@ func main() {
 			logger.String("mode", config.GlobalConfig.Server.Mode),
 		)
 
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Fatal(ctx, "Failed to start server", logger.Error_(err))
 		}
 	}()

@@ -3,6 +3,7 @@ server:
   mode: release
   name: distributed-service
   version: v1.0.0
+  tags: "myapp,test-server"
 
 logger:
   level: info
@@ -45,4 +46,13 @@ rabbitmq:
   port: 5672
   username: guest
   password: guest
-  vhost: / 
+  vhost: /
+
+tracing:
+  service_name: distributed-service
+  service_version: v1.0.0
+  environment: production
+  enabled: true
+  exporter_type: otlp
+  endpoint: "jaeger:4318"
+  sample_ratio: 0.1 
