@@ -5,13 +5,14 @@ echo "🛠️  设置分布式微服务开发环境..."
 
 # 检查Go是否安装
 if ! command -v go &> /dev/null; then
-    echo "❌ Go 未安装，请先安装 Go 1.19+"
+    echo "❌ Go 未安装，请先安装 Go 1.23+"
     exit 1
 fi
 
 echo "✅ Go 版本: $(go version)"
 
 # 设置Go bin路径
+# shellcheck disable=SC2155
 export PATH=$PATH:$(go env GOPATH)/bin
 
 # 安装必要的开发工具
