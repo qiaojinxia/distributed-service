@@ -4,6 +4,7 @@ import (
 	"context"
 	"distributed-service/internal/model"
 	"distributed-service/pkg/logger"
+	"distributed-service/pkg/metrics"
 	"distributed-service/pkg/tracing"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -39,7 +40,10 @@ func (r *userRepository) Create(ctx context.Context, user *model.User) error {
 
 	logger.Info(ctx, "Creating user", logger.String("username", user.Username))
 
-	err := r.db.WithContext(ctx).Create(user).Error
+	err := metrics.MeasureDatabaseQuery("CREATE", "users", func() error {
+		return r.db.WithContext(ctx).Create(user).Error
+	})
+
 	if err != nil {
 		tracing.RecordError(ctx, err)
 		return err
@@ -55,15 +59,19 @@ func (r *userRepository) GetByID(ctx context.Context, id uint) (*model.User, err
 
 	tracing.AddSpanAttributes(ctx, attribute.Int64("user.id", int64(id)))
 
-	var user model.User
-	err := r.db.WithContext(ctx).First(&user, id).Error
+	user, err := metrics.MeasureDatabaseQueryWithResult("SELECT", "users", func() (*model.User, error) {
+		var user model.User
+		err := r.db.WithContext(ctx).First(&user, id).Error
+		return &user, err
+	})
+
 	if err != nil {
 		tracing.RecordError(ctx, err)
 		return nil, err
 	}
 
 	tracing.TraceDatabase(ctx, "SELECT", "users", 1)
-	return &user, nil
+	return user, nil
 }
 
 func (r *userRepository) GetByUsername(ctx context.Context, username string) (*model.User, error) {
@@ -72,15 +80,19 @@ func (r *userRepository) GetByUsername(ctx context.Context, username string) (*m
 
 	tracing.AddSpanAttributes(ctx, attribute.String("user.username", username))
 
-	var user model.User
-	err := r.db.WithContext(ctx).Where("username = ?", username).First(&user).Error
+	user, err := metrics.MeasureDatabaseQueryWithResult("SELECT", "users", func() (*model.User, error) {
+		var user model.User
+		err := r.db.WithContext(ctx).Where("username = ?", username).First(&user).Error
+		return &user, err
+	})
+
 	if err != nil {
 		tracing.RecordError(ctx, err)
 		return nil, err
 	}
 
 	tracing.TraceDatabase(ctx, "SELECT", "users", 1)
-	return &user, nil
+	return user, nil
 }
 
 func (r *userRepository) Update(ctx context.Context, user *model.User) error {
@@ -92,7 +104,10 @@ func (r *userRepository) Update(ctx context.Context, user *model.User) error {
 		attribute.String("user.username", user.Username),
 	)
 
-	err := r.db.WithContext(ctx).Save(user).Error
+	err := metrics.MeasureDatabaseQuery("UPDATE", "users", func() error {
+		return r.db.WithContext(ctx).Save(user).Error
+	})
+
 	if err != nil {
 		tracing.RecordError(ctx, err)
 		return err
@@ -108,7 +123,10 @@ func (r *userRepository) Delete(ctx context.Context, id uint) error {
 
 	tracing.AddSpanAttributes(ctx, attribute.Int64("user.id", int64(id)))
 
-	err := r.db.WithContext(ctx).Delete(&model.User{}, id).Error
+	err := metrics.MeasureDatabaseQuery("DELETE", "users", func() error {
+		return r.db.WithContext(ctx).Delete(&model.User{}, id).Error
+	})
+
 	if err != nil {
 		tracing.RecordError(ctx, err)
 		return err

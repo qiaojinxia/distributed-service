@@ -1,9 +1,8 @@
 package model
 
 import (
-	"time"
-
 	"gorm.io/gorm"
+	"time"
 )
 
 // User represents the user model

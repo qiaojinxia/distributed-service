@@ -55,4 +55,23 @@ tracing:
   enabled: true
   exporter_type: otlp
   endpoint: "jaeger:4318"
-  sample_ratio: 0.1 
+  sample_ratio: 0.1
+
+ratelimit:
+  enabled: true
+  store_type: redis  # 支持 memory, redis
+  redis_prefix: "ratelimit:"
+  default_config:
+    health_check: "10-S"      # 健康检查：每秒10次
+    auth_public: "20-M"       # 认证公开端点：每分钟20次
+    auth_protected: "10-M"    # 认证保护端点：每分钟10次
+    user_public: "30-M"       # 用户公开API：每分钟30次
+    user_protected: "50-M"    # 用户保护API：每分钟50次
+  endpoints:
+    "/health": "10-S"
+    "/api/v1/auth/register": "20-M"
+    "/api/v1/auth/login": "20-M"
+    "/api/v1/auth/refresh": "20-M"
+    "/api/v1/auth/change-password": "10-M"
+    "/api/v1/users/me": "50-M"
+    "/api/v1/users": "30-M" 

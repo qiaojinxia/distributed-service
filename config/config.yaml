@@ -55,4 +55,23 @@ tracing:
   enabled: true
   exporter_type: stdout  # 可选: "otlp", "stdout"
   endpoint: "localhost:14268"  # Jaeger endpoint
-  sample_ratio: 1.0  # 1.0 表示采样所有请求，生产环境建议设为 0.1 或更小 
+  sample_ratio: 1.0  # 1.0 表示采样所有请求，生产环境建议设为 0.1 或更小
+
+ratelimit:
+  enabled: true
+  store_type: memory  # 本地开发使用内存存储，生产环境使用redis
+  redis_prefix: "ratelimit:"
+  default_config:
+    health_check: "10-S"      # 健康检查：每秒10次
+    auth_public: "20-M"       # 认证公开端点：每分钟20次
+    auth_protected: "10-M"    # 认证保护端点：每分钟10次
+    user_public: "30-M"       # 用户公开API：每分钟30次
+    user_protected: "50-M"    # 用户保护API：每分钟50次
+  endpoints:
+    "/health": "10-S"
+    "/api/v1/auth/register": "20-M"
+    "/api/v1/auth/login": "20-M"
+    "/api/v1/auth/refresh": "20-M"
+    "/api/v1/auth/change-password": "10-M"
+    "/api/v1/users/me": "50-M"
+    "/api/v1/users": "30-M" 

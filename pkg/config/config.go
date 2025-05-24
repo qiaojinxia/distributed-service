@@ -7,15 +7,16 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Logger   LoggerConfig   `mapstructure:"logger"`
-	JWT      JWTConfig      `mapstructure:"jwt"`
-	Consul   ConsulConfig   `mapstructure:"consul"`
-	Metrics  MetricsConfig  `mapstructure:"metrics"`
-	MySQL    MySQLConfig    `mapstructure:"mysql"`
-	Redis    RedisConfig    `mapstructure:"redis"`
-	RabbitMQ RabbitMQConfig `mapstructure:"rabbitmq"`
-	Tracing  TracingConfig  `mapstructure:"tracing"`
+	Server    ServerConfig    `mapstructure:"server"`
+	Logger    LoggerConfig    `mapstructure:"logger"`
+	JWT       JWTConfig       `mapstructure:"jwt"`
+	Consul    ConsulConfig    `mapstructure:"consul"`
+	Metrics   MetricsConfig   `mapstructure:"metrics"`
+	MySQL     MySQLConfig     `mapstructure:"mysql"`
+	Redis     RedisConfig     `mapstructure:"redis"`
+	RabbitMQ  RabbitMQConfig  `mapstructure:"rabbitmq"`
+	Tracing   TracingConfig   `mapstructure:"tracing"`
+	RateLimit RateLimitConfig `mapstructure:"ratelimit"`
 }
 
 type ServerConfig struct {
@@ -84,6 +85,22 @@ type TracingConfig struct {
 	ExporterType   string  `mapstructure:"exporter_type"` // "otlp", "stdout", "jaeger"
 	Endpoint       string  `mapstructure:"endpoint"`
 	SampleRatio    float64 `mapstructure:"sample_ratio"`
+}
+
+type RateLimitConfig struct {
+	Enabled       bool                   `mapstructure:"enabled"`
+	StoreType     string                 `mapstructure:"store_type"` // "memory", "redis"
+	RedisPrefix   string                 `mapstructure:"redis_prefix"`
+	DefaultConfig RateLimitDefaultConfig `mapstructure:"default_config"`
+	Endpoints     map[string]string      `mapstructure:"endpoints"`
+}
+
+type RateLimitDefaultConfig struct {
+	HealthCheck   string `mapstructure:"health_check"`
+	AuthPublic    string `mapstructure:"auth_public"`
+	AuthProtected string `mapstructure:"auth_protected"`
+	UserPublic    string `mapstructure:"user_public"`
+	UserProtected string `mapstructure:"user_protected"`
 }
 
 var GlobalConfig Config

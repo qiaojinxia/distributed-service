@@ -60,6 +60,7 @@ health_checks=(
     "RabbitMQ:http://localhost:15672"
     "Grafana:http://localhost:3000"
     "Prometheus:http://localhost:9091"
+    "Jaeger:http://localhost:16686"
 )
 
 for check in "${health_checks[@]}"; do
@@ -68,7 +69,7 @@ for check in "${health_checks[@]}"; do
     # shellcheck disable=SC2086
     url=$(echo $check | cut -d: -f2-)
     echo -n "检查 $name ... "
-    if curl -f -s "$url" > /dev/null 2>&1; then
+    if curl -f -s --max-time 5 --connect-timeout 3 "$url" > /dev/null 2>&1; then
         echo "✅ 正常"
     else
         echo "❌ 异常"
@@ -131,6 +132,22 @@ echo "  -d '{\"token\":\"YOUR_JWT_TOKEN\"}'"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
+# 数据库指标监控测试
+echo "📊 数据库指标监控测试："
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "# 1. 运行数据库指标测试脚本"
+echo "./scripts/test-metrics.sh"
+echo ""
+echo "# 2. 查看 Prometheus 指标"
+echo "curl http://localhost:9090/metrics | grep database_query_duration_seconds"
+echo ""
+echo "# 3. 在 Prometheus UI 中查询数据库指标"
+echo "访问: http://localhost:9091"
+echo "查询: database_query_duration_seconds"
+echo "查询: rate(database_query_duration_seconds_count[5m])"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
 # 分布式追踪测试
 echo "🔍 分布式链路追踪测试："
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -174,47 +191,204 @@ echo "  - 部署文档: README-Docker.md"
 echo "  - 项目文档: README.md"
 echo ""
 
-# 可选的追踪功能验证（增加超时和更明显的提示）
+# 可选的功能验证测试
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🔍 链路追踪功能验证选项："
-echo "   - 输入 'y' 或 'Y': 立即运行追踪验证测试"
+echo "🧪 功能测试选项："
+echo "   - 输入 '1': 运行数据库指标测试"
+echo "   - 输入 '2': 运行链路追踪测试"
+echo "   - 输入 '3': 运行限流测试"
+echo "   - 输入 '4': 运行限流和熔断器综合测试"
+echo "   - 输入 '5': 运行所有基础测试"
+echo "   - 输入 '6': 运行所有测试(包括系统保护)"
 echo "   - 输入 'n' 或直接回车: 跳过测试，稍后手动运行"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-read -t 15 -p "🤔 是否立即运行链路追踪测试？(y/N，15秒后自动跳过): " run_tracing_test
+# shellcheck disable=SC2162
+read -t 15 -p "🤔 请选择要运行的测试 (1/2/3/4/5/6/N，15秒后自动跳过): " test_choice
 echo ""
 
-if [[ $run_tracing_test =~ ^[Yy]$ ]]; then
-    echo "🚀 开始运行链路追踪测试..."
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    
-    # 等待应用完全启动
-    echo "⏳ 等待应用完全启动 (额外等待 10 秒)..."
-    sleep 10
-    
-    # 检查验证脚本是否存在，优先使用快速验证脚本
-    if [ -f "./scripts/verify-tracing.sh" ]; then
-        echo "🎯 执行快速追踪验证..."
-        chmod +x ./scripts/verify-tracing.sh
-        ./scripts/verify-tracing.sh || echo "⚠️  验证脚本执行遇到问题，请检查服务状态"
-    elif [ -f "./scripts/test-tracing.sh" ]; then
-        echo "🎯 执行完整追踪测试..."
-        chmod +x ./scripts/test-tracing.sh
-        ./scripts/test-tracing.sh || echo "⚠️  测试脚本执行遇到问题，请检查服务状态"
-    else
-        echo "❌ 追踪测试脚本不存在"
-        echo "💡 请手动运行以下命令测试追踪功能："
-        echo "   curl -X GET http://localhost:8080/health -H 'X-Request-ID: manual-test'"
-    fi
-    
-    echo ""
-    echo "✅ 追踪测试完成！"
-    echo "🔍 现在可以访问 Jaeger UI 查看追踪数据: http://localhost:16686"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-else
-    echo "⏭️  跳过自动测试，您可以稍后手动运行:"
-    echo "   ./scripts/verify-tracing.sh  # 快速验证"
-    echo "   ./scripts/test-tracing.sh    # 完整测试"
-fi
+# 等待应用完全启动
+echo "⏳ 等待应用完全启动 (额外等待 10 秒)..."
+sleep 10
+
+case $test_choice in
+    "1")
+        echo "📊 开始运行数据库指标测试..."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        if [ -f "./scripts/test-metrics.sh" ]; then
+            echo "🎯 执行数据库指标测试..."
+            chmod +x ./scripts/test-metrics.sh
+            ./scripts/test-metrics.sh || echo "⚠️  指标测试脚本执行遇到问题，请检查服务状态"
+        else
+            echo "❌ 数据库指标测试脚本不存在"
+            echo "💡 请手动运行以下命令测试指标功能："
+            echo "   curl http://localhost:9090/metrics | grep database_query_duration_seconds"
+        fi
+        
+        echo ""
+        echo "✅ 数据库指标测试完成！"
+        echo "📊 现在可以访问以下地址查看指标数据:"
+        echo "   - Prometheus: http://localhost:9091"
+        echo "   - Grafana: http://localhost:3000 (admin/admin123)"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        ;;
+    "2")
+        echo "🔍 开始运行链路追踪测试..."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        if [ -f "./scripts/verify-tracing.sh" ]; then
+            echo "🎯 执行快速追踪验证..."
+            chmod +x ./scripts/verify-tracing.sh
+            ./scripts/verify-tracing.sh || echo "⚠️  验证脚本执行遇到问题，请检查服务状态"
+        elif [ -f "./scripts/test-tracing.sh" ]; then
+            echo "🎯 执行完整追踪测试..."
+            chmod +x ./scripts/test-tracing.sh
+            ./scripts/test-tracing.sh || echo "⚠️  测试脚本执行遇到问题，请检查服务状态"
+        else
+            echo "❌ 追踪测试脚本不存在"
+            echo "💡 请手动运行以下命令测试追踪功能："
+            echo "   curl -X GET http://localhost:8080/health -H 'X-Request-ID: manual-test'"
+        fi
+        
+        echo ""
+        echo "✅ 链路追踪测试完成！"
+        echo "🔍 现在可以访问 Jaeger UI 查看追踪数据: http://localhost:16686"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        ;;
+    "3")
+        echo "🛡️ 开始运行限流测试..."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        if [ -f "./scripts/test-ratelimit.sh" ]; then
+            echo "🎯 执行限流功能测试..."
+            chmod +x ./scripts/test-ratelimit.sh
+            ./scripts/test-ratelimit.sh || echo "⚠️  限流测试遇到问题"
+        else
+            echo "❌ 限流测试脚本不存在"
+            echo "💡 请手动运行以下命令测试限流功能："
+            echo "   for i in {1..15}; do curl -w 'HTTP_%{http_code}\\n' -o /dev/null http://localhost:8080/health; sleep 0.1; done"
+        fi
+        
+        echo ""
+        echo "✅ 限流测试完成！"
+        echo "🛡️ 现在可以访问以下地址查看状态:"
+        echo "   - 应用健康检查: http://localhost:8080/health"
+        echo "   - Prometheus指标: http://localhost:9090/metrics"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        ;;
+    "4")
+        echo "🛡️ 开始运行限流和熔断器综合测试..."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        if [ -f "./scripts/test-ratelimit-circuitbreaker.sh" ]; then
+            echo "🎯 执行限流和熔断器综合测试..."
+            chmod +x ./scripts/test-ratelimit-circuitbreaker.sh
+            ./scripts/test-ratelimit-circuitbreaker.sh || echo "⚠️  综合测试遇到问题"
+        else
+            echo "❌ 限流熔断器测试脚本不存在"
+            echo "💡 请手动运行以下命令测试功能："
+            echo "   curl http://localhost:8080/circuit-breaker/status"
+            echo "   curl http://localhost:8080/health (多次快速请求测试限流)"
+        fi
+        
+        echo ""
+        echo "✅ 限流和熔断器测试完成！"
+        echo "🛡️ 现在可以访问以下地址查看状态:"
+        echo "   - 熔断器状态: http://localhost:8080/circuit-breaker/status"
+        echo "   - Hystrix流: http://localhost:8080/hystrix"
+        echo "   - 限流验证: 快速访问 http://localhost:8080/health 测试限流"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        ;;
+    "5")
+        echo "🚀 开始运行所有基础测试..."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        # 运行数据库指标测试
+        echo "📊 1/2 执行数据库指标测试..."
+        if [ -f "./scripts/test-metrics.sh" ]; then
+            chmod +x ./scripts/test-metrics.sh
+            ./scripts/test-metrics.sh || echo "⚠️  指标测试遇到问题"
+        else
+            echo "❌ 数据库指标测试脚本不存在"
+        fi
+        
+        echo ""
+        echo "🔍 2/2 执行链路追踪测试..."
+        if [ -f "./scripts/verify-tracing.sh" ]; then
+            chmod +x ./scripts/verify-tracing.sh
+            ./scripts/verify-tracing.sh || echo "⚠️  追踪测试遇到问题"
+        elif [ -f "./scripts/test-tracing.sh" ]; then
+            chmod +x ./scripts/test-tracing.sh
+            ./scripts/test-tracing.sh || echo "⚠️  追踪测试遇到问题"
+        else
+            echo "❌ 追踪测试脚本不存在"
+        fi
+        
+        echo ""
+        echo "✅ 所有基础测试完成！"
+        echo "📊 监控地址: http://localhost:9091 (Prometheus), http://localhost:3000 (Grafana)"
+        echo "🔍 追踪地址: http://localhost:16686 (Jaeger)"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        ;;
+    "6")
+        echo "🚀 开始运行所有测试(包括系统保护)..."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        # 运行数据库指标测试
+        echo "📊 1/4 执行数据库指标测试..."
+        if [ -f "./scripts/test-metrics.sh" ]; then
+            chmod +x ./scripts/test-metrics.sh
+            ./scripts/test-metrics.sh || echo "⚠️  指标测试遇到问题"
+        else
+            echo "❌ 数据库指标测试脚本不存在"
+        fi
+        
+        echo ""
+        echo "🔍 2/4 执行链路追踪测试..."
+        if [ -f "./scripts/verify-tracing.sh" ]; then
+            chmod +x ./scripts/verify-tracing.sh
+            ./scripts/verify-tracing.sh || echo "⚠️  追踪测试遇到问题"
+        elif [ -f "./scripts/test-tracing.sh" ]; then
+            chmod +x ./scripts/test-tracing.sh
+            ./scripts/test-tracing.sh || echo "⚠️  追踪测试遇到问题"
+        else
+            echo "❌ 追踪测试脚本不存在"
+        fi
+        
+        echo ""
+        echo "🛡️ 3/4 执行限流测试..."
+        if [ -f "./scripts/test-ratelimit.sh" ]; then
+            chmod +x ./scripts/test-ratelimit.sh
+            ./scripts/test-ratelimit.sh || echo "⚠️  限流测试遇到问题"
+        else
+            echo "❌ 限流测试脚本不存在"
+        fi
+        
+        echo ""
+        echo "🛡️ 4/4 执行限流和熔断器综合测试..."
+        if [ -f "./scripts/test-ratelimit-circuitbreaker.sh" ]; then
+            chmod +x ./scripts/test-ratelimit-circuitbreaker.sh
+            ./scripts/test-ratelimit-circuitbreaker.sh || echo "⚠️  综合测试遇到问题"
+        else
+            echo "❌ 限流熔断器测试脚本不存在"
+        fi
+        
+        echo ""
+        echo "✅ 所有测试完成！"
+        echo "📊 指标监控: http://localhost:9091 (Prometheus), http://localhost:3000 (Grafana)"
+        echo "🔍 链路追踪: http://localhost:16686 (Jaeger)"
+        echo "🛡️ 系统保护: http://localhost:8080/circuit-breaker/status (熔断器), http://localhost:8080/hystrix (流)"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        ;;
+    *)
+        echo "⏭️  跳过自动测试，您可以稍后手动运行:"
+        echo "   ./scripts/test-metrics.sh                     # 数据库指标测试"
+        echo "   ./scripts/verify-tracing.sh                   # 链路追踪快速验证"
+        echo "   ./scripts/test-tracing.sh                     # 链路追踪完整测试"
+        echo "   ./scripts/test-ratelimit.sh                   # 限流功能测试"
+        echo "   ./scripts/test-ratelimit-circuitbreaker.sh    # 限流和熔断器综合测试"
+        ;;
+esac
 
 echo ""
 echo "🎉 部署和配置完成！享受您的分布式微服务体验！"

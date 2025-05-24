@@ -22,10 +22,11 @@ for service in "${services[@]}"; do
     name=$(echo $service | cut -d: -f1)
     url=$(echo $service | cut -d: -f2-)
     
-    if curl -f -s "$url" > /dev/null; then
-        echo "✅ $name 运行正常"
+    echo -n "检查 $name ... "
+    if curl -f -s --max-time 5 --connect-timeout 3 "$url" > /dev/null 2>&1; then
+        echo "✅ 正常"
     else
-        echo "❌ $name 无法访问: $url"
+        echo "❌ 异常 ($url)"
         all_services_up=false
     fi
 done
@@ -48,13 +49,13 @@ echo "📝 测试数据: $TEST_USERNAME / $TEST_EMAIL"
 
 # 1. 健康检查（生成追踪数据）
 echo "🏥 测试健康检查..."
-HEALTH_RESPONSE=$(curl -s -X GET "$BASE_URL/health" \
+HEALTH_RESPONSE=$(curl -s --max-time 10 --connect-timeout 5 -X GET "$BASE_URL/health" \
   -H "X-Request-ID: verify-health-$TIMESTAMP")
 echo "健康检查响应: $HEALTH_RESPONSE"
 
 # 2. 用户注册（生成复杂追踪数据）
 echo "👤 测试用户注册..."
-REGISTER_RESPONSE=$(curl -s -X POST "$BASE_URL/api/v1/auth/register" \
+REGISTER_RESPONSE=$(curl -s --max-time 10 --connect-timeout 5 -X POST "$BASE_URL/api/v1/auth/register" \
   -H "Content-Type: application/json" \
   -H "X-Request-ID: verify-register-$TIMESTAMP" \
   -d "{
@@ -71,7 +72,7 @@ fi
 
 # 3. 用户登录（生成更多追踪数据）
 echo "🔑 测试用户登录..."
-LOGIN_RESPONSE=$(curl -s -X POST "$BASE_URL/api/v1/auth/login" \
+LOGIN_RESPONSE=$(curl -s --max-time 10 --connect-timeout 5 -X POST "$BASE_URL/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   -H "X-Request-ID: verify-login-$TIMESTAMP" \
   -d "{

@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -48,3 +50,23 @@ var (
 		[]string{"cache"},
 	)
 )
+
+// MeasureDatabaseQuery measures the execution time of a database operation
+func MeasureDatabaseQuery(operation, table string, fn func() error) error {
+	start := time.Now()
+	err := fn()
+	duration := time.Since(start).Seconds()
+
+	DatabaseQueryDuration.WithLabelValues(operation, table).Observe(duration)
+	return err
+}
+
+// MeasureDatabaseQueryWithResult measures the execution time of a database operation with a result
+func MeasureDatabaseQueryWithResult[T any](operation, table string, fn func() (T, error)) (T, error) {
+	start := time.Now()
+	result, err := fn()
+	duration := time.Since(start).Seconds()
+
+	DatabaseQueryDuration.WithLabelValues(operation, table).Observe(duration)
+	return result, err
+}

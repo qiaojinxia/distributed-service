@@ -20,6 +20,16 @@
 - **权限控制** - 分级 API 访问权限
 - **Token 刷新** - 自动续期机制
 
+### 🛡️ 系统保护
+- **API 限流** - 多层次限流保护（IP、用户、自定义）
+  - 配置文件驱动的限流规则
+  - 支持内存和Redis双存储后端
+  - 端点级别的精细化限流控制
+  - 标准HTTP响应头和429状态码
+- **熔断器** - 防止服务雪崩和级联故障
+- **降级处理** - 服务不可用时的优雅降级
+- **实时监控** - 限流和熔断状态监控
+
 ### 🗄️ 数据存储
 - **MySQL** - 主数据库，支持事务和连接池
 - **Redis** - 高性能缓存，支持集群
@@ -44,13 +54,15 @@
 
 ### 📊 监控日志
 - **结构化日志** - 基于 Zap 的高性能日志
-- **指标收集** - HTTP、数据库、缓存指标
+- **HTTP 指标** - 请求数量、响应时间、状态码分布
+- **数据库指标** - 查询时间、操作类型、表级别统计
+- **缓存指标** - 命中率、响应时间、内存使用
 - **分布式追踪** - OpenTelemetry + Jaeger 完整请求链路追踪
 - **告警支持** - 集成 Prometheus AlertManager
 
 ## 🚀 快速开始
 
-### 开发环境
+### 本地开发
 
 ```bash
 # 克隆项目
@@ -64,25 +76,17 @@ go mod tidy
 go run main.go
 ```
 
-### 一键部署（推荐）
+### Docker 部署
 
 ```bash
-# 使用 Docker Compose 一键部署
+# 一键部署（推荐）
 ./deploy.sh
-```
 
-### 手动部署
-
-```bash
-# 构建并启动所有服务
+# 或手动部署
 docker-compose up --build -d
-
-# 查看服务状态
-docker-compose ps
-
-# 查看日志
-docker-compose logs -f app
 ```
+
+📖 **详细部署指南**: [Docker 部署文档](README-Docker.md)
 
 ## 📊 服务访问地址
 
@@ -92,80 +96,171 @@ docker-compose logs -f app
 | 📖 API 文档 | http://localhost:8080/swagger/index.html | Swagger UI | - |
 | 🏥 健康检查 | http://localhost:8080/health | 服务状态 | - |
 | 📊 指标监控 | http://localhost:9090/metrics | Prometheus 指标 | - |
+| 🛡️ 熔断器状态 | http://localhost:8080/circuit-breaker/status | 熔断器监控 | - |
+| 📡 Hystrix 流 | http://localhost:8080/hystrix | 实时监控流 | - |
 | 🔍 链路追踪 | http://localhost:16686 | Jaeger UI | - |
 | 🗂️ 服务注册 | http://localhost:8500 | Consul UI | - |
 | 🐰 消息队列 | http://localhost:15672 | RabbitMQ 管理 | guest/guest |
 | 📈 监控系统 | http://localhost:9091 | Prometheus | - |
 | 📊 可视化 | http://localhost:3000 | Grafana | admin/admin123 |
 
-## 🔐 认证 API
+## 🔐 API 使用示例
 
-### 用户注册
+### 快速测试
 ```bash
+# 用户注册
 curl -X POST http://localhost:8080/api/v1/auth/register \
   -H 'Content-Type: application/json' \
   -d '{"username":"newuser","email":"user@example.com","password":"password123"}'
-```
 
-### 用户登录
-```bash
+# 用户登录
 curl -X POST http://localhost:8080/api/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"newuser","password":"password123"}'
-```
 
-### 访问受保护 API
-```bash
+# 访问受保护 API
 curl -X POST http://localhost:8080/api/v1/users \
-  -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer YOUR_JWT_TOKEN' \
   -d '{"username":"protected","email":"protected@example.com","password":"password123"}'
 ```
 
-### 修改密码
-```bash
-curl -X POST http://localhost:8080/api/v1/auth/change-password \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer YOUR_JWT_TOKEN' \
-  -d '{"old_password":"password123","new_password":"newpassword456"}'
-```
+📖 **完整API文档**: [Swagger UI](http://localhost:8080/swagger/index.html) | [部署文档](README-Docker.md)
 
-## 🔍 分布式追踪测试
+## 🔍 分布式追踪
 
-### 自动化测试脚本
+### 快速测试
 ```bash
-# 运行完整的追踪测试
+# 运行追踪测试
 ./scripts/test-tracing.sh
-```
 
-### 手动测试追踪功能
-```bash
-# 1. 注册用户（会产生追踪数据）
+# 生成追踪数据
 curl -X POST http://localhost:8080/api/v1/auth/register \
-  -H 'Content-Type: application/json' \
-  -H 'X-Request-ID: trace-test-register' \
+  -H 'X-Request-ID: trace-test' \
   -d '{"username":"traceuser","email":"trace@example.com","password":"password123"}'
-
-# 2. 登录用户（会产生追踪数据）
-curl -X POST http://localhost:8080/api/v1/auth/login \
-  -H 'Content-Type: application/json' \
-  -H 'X-Request-ID: trace-test-login' \
-  -d '{"username":"traceuser","password":"password123"}'
 ```
 
-### 查看追踪数据
-1. 访问 Jaeger UI: http://localhost:16686
-2. 在 Service 下拉框选择 `distributed-service`
-3. 点击 "Find Traces" 查看追踪链路
-4. 点击具体 trace 查看详细的 span 信息
+### 查看追踪链路
+- 访问 [Jaeger UI](http://localhost:16686)
+- 选择服务 `distributed-service`
+- 查看完整的请求调用链
 
-### 追踪数据包含
-- **HTTP 请求层**: 请求方法、路径、状态码、响应时间
-- **Service 业务层**: 用户操作、业务逻辑执行时间
-- **Repository 数据层**: 数据库操作、SQL 执行时间
+### 追踪覆盖
+- **HTTP层**: 请求路径、状态码、响应时间
+- **Service层**: 业务逻辑执行时间
+- **Repository层**: 数据库操作和SQL执行时间
 - **错误追踪**: 异常信息和错误堆栈
 
-📖 **详细文档**: [分布式追踪使用指南](TRACING.md)
+📖 **详细文档**: [分布式追踪使用指南](docs/TRACING.md)
+
+## 📊 监控指标
+
+### 指标类型
+- **HTTP请求**: 请求数量、响应时间、状态码分布
+- **数据库查询**: 查询时间、操作类型、表级别统计  
+- **缓存性能**: 命中率、响应时间、内存使用
+- **分布式追踪**: 完整请求链路追踪
+
+### 快速验证
+```bash
+# 测试数据库指标
+./scripts/test-metrics.sh
+
+# 查看指标数据
+curl http://localhost:9090/metrics | grep database_query_duration
+```
+
+### 监控面板
+- **Prometheus**: http://localhost:9091
+- **Grafana**: http://localhost:3000 (admin/admin123)
+- **指标端点**: http://localhost:9090/metrics
+
+## 🛡️ 系统保护
+
+### 功能特性
+- **多层限流**: IP限流、用户限流、自定义限流
+- **智能熔断**: 防止服务雪崩和级联故障
+- **优雅降级**: 服务不可用时的备用响应
+- **实时监控**: 限流和熔断状态可视化
+
+### 限流配置
+项目支持通过配置文件管理所有限流规则，支持多种存储后端：
+
+```yaml
+ratelimit:
+  enabled: true                    # 启用限流
+  store_type: redis               # memory 或 redis
+  redis_prefix: "ratelimit:"      # Redis键前缀
+  default_config:                 # 默认配置
+    health_check: "10-S"          # 健康检查：10次/秒
+    auth_public: "20-M"           # 认证端点：20次/分钟
+    auth_protected: "10-M"        # 保护端点：10次/分钟
+    user_public: "30-M"           # 用户公开API：30次/分钟
+    user_protected: "50-M"        # 用户保护API：50次/分钟
+  endpoints:                      # 端点特定配置
+    "/health": "10-S"
+    "/api/v1/auth/register": "20-M"
+    "/api/v1/auth/login": "20-M"
+    # ... 更多端点配置
+```
+
+### 快速测试
+```bash
+# 1. 运行基础限流功能测试
+./scripts/test-ratelimit.sh
+# 测试内容: IP限流、端点限流、响应头验证、配置验证
+
+# 2. 运行系统保护综合测试 
+./scripts/test-ratelimit-circuitbreaker.sh
+# 测试内容: 限流+熔断器、Redis存储、监控端点、错误处理
+
+# 3. 手动快速验证限流
+for i in {1..15}; do curl -w "HTTP_%{http_code}\n" http://localhost:8080/health; sleep 0.1; done
+# 预期: 前10个返回200，后5个返回429
+
+# 4. 验证配置文件正确性
+./scripts/validate-config.sh
+# 检查: 配置文件完整性、限流格式、编译验证
+
+# 5. 查看熔断器实时状态
+curl http://localhost:8080/circuit-breaker/status | jq '.'
+# 显示: 熔断器状态、错误率、请求量等
+```
+
+### 测试脚本特性
+- ✅ **服务健康检查**: 自动检测服务可用性，支持重试机制
+- ✅ **彩色输出**: 直观的测试结果展示，成功/失败/警告状态区分
+- ✅ **详细报告**: 测试通过率统计，问题诊断建议
+- ✅ **错误处理**: 优雅的错误处理和回退机制
+- ✅ **配置验证**: 自动验证配置文件完整性和格式正确性
+
+### 限流策略
+- **IP限流**: 基于客户端IP地址，适用于公开API
+- **用户限流**: 基于JWT token中的用户ID，适用于认证API
+- **自定义限流**: 支持自定义键生成函数的灵活限流
+- **端点限流**: 根据配置文件自动应用不同规则
+
+### 存储后端
+- **内存存储**: 适用于开发环境和单实例部署
+- **Redis存储**: 适用于生产环境和分布式部署，支持自动降级
+
+### 配置概览
+- **健康检查**: 10次/秒 IP限流
+- **认证端点**: 20次/分钟 IP限流  
+- **用户API**: 30-50次/分钟 用户限流
+- **熔断保护**: 2-5秒超时，25-50%错误率阈值
+
+### 响应头信息
+限流触发时会返回标准的HTTP响应头：
+- `X-RateLimit-Limit`: 限流上限
+- `X-RateLimit-Remaining`: 剩余请求数
+- `X-RateLimit-Reset`: 重置时间戳
+- `HTTP 429`: Too Many Requests 状态码
+
+### 监控端点
+- **熔断器状态**: http://localhost:8080/circuit-breaker/status
+- **Hystrix流**: http://localhost:8080/hystrix
+
+📖 **详细文档**: [限流功能详细说明](docs/RATELIMIT.md) | [限流和熔断器使用指南](docs/RATELIMIT-CIRCUITBREAKER.md)
 
 ## 📁 项目结构
 
@@ -182,13 +277,19 @@ distributed-service/
 │       ├── config-docker.yaml    # 生产环境配置
 │       ├── redis.conf            # Redis 配置
 │       └── prometheus.yml        # 监控配置
-├── 🗄️ 数据库脚本
+├── 🗄️ 脚本工具
 │   └── scripts/
 │       ├── mysql-init.sql        # 数据库初始化
-│       └── test-tracing.sh       # 分布式追踪测试脚本
+│       ├── test-tracing.sh       # 分布式追踪测试脚本
+│       ├── test-metrics.sh       # 数据库指标测试脚本
+│       ├── test-ratelimit.sh     # 限流功能测试脚本(改进版)
+│       ├── test-ratelimit-circuitbreaker.sh  # 限流和熔断器综合测试脚本(改进版)
+│       └── validate-config.sh    # 配置验证脚本
 ├── 📚 API 文档
 │   └── docs/                     # Swagger 生成文档
-│       └── TRACING.md            # 分布式追踪使用指南
+│       ├── TRACING.md            # 分布式追踪使用指南
+│       ├── RATELIMIT.md          # 限流功能详细文档
+│       └── RATELIMIT-SUMMARY.md  # 限流功能实现总结
 ├── 🏗️ 应用代码
 │   ├── internal/                 # 内部业务逻辑
 │   │   ├── api/                  # HTTP 处理层
@@ -211,6 +312,8 @@ distributed-service/
 │       ├── auth/                 # 认证组件
 │       ├── mq/                   # 消息队列
 │       ├── registry/             # 服务注册
+│       ├── ratelimit/            # API限流
+│       ├── circuitbreaker/       # 熔断器
 │       └── tracing/              # 分布式链路追踪
 ├── go.mod                        # Go 模块依赖
 ├── go.sum                        # 依赖校验文件
@@ -264,6 +367,107 @@ items.POST("", handler.Create)
 ```bash
 swag init
 ```
+
+### 添加限流和熔断器保护
+
+在新的API端点中添加限流和熔断器保护：
+
+```go
+// 在路由注册时添加限流中间件
+authBase := v1.Group("/auth")
+authBase.Use(rateLimiter.IPRateLimit(rateLimiter.GetConfiguredLimit("auth_public"))) // 使用配置的限流规则
+{
+    authBase.POST("/register", 
+        circuitBreaker.Middleware("auth_register", nil),
+        authHandler.Register)
+}
+
+// 不同类型的限流策略
+// 1. 使用配置的限流规则
+r.GET("/health", rateLimiter.IPRateLimit(rateLimiter.GetConfiguredLimit("health_check")), handler)
+
+// 2. 使用自定义限流规则
+r.POST("/api/v1/upload", rateLimiter.IPRateLimit("5-M"), handler) // 每分钟5次
+
+// 3. 用户级别限流（需要JWT认证）
+protectedGroup := v1.Group("/protected")
+protectedGroup.Use(middleware.JWTAuth(jwtManager))
+protectedGroup.Use(rateLimiter.UserRateLimit(rateLimiter.GetConfiguredLimit("user_protected")))
+
+// 4. 端点特定限流（从配置文件读取）
+r.POST("/special", rateLimiter.EndpointRateLimit("/special"), handler)
+
+// 配置自定义熔断器
+circuitbreaker.ConfigureCommand("my_service", circuitbreaker.Config{
+    Timeout:                3000, // 3秒超时
+    MaxConcurrentRequests:  50,   // 最大50并发
+    RequestVolumeThreshold: 10,   // 10个请求后开始统计
+    SleepWindow:            5000, // 5秒休眠窗口
+    ErrorPercentThreshold:  30,   // 30%错误率阈值
+})
+```
+
+### 限流配置管理
+
+在配置文件中添加新的端点限流规则：
+
+```yaml
+# config/config.yaml 或 config/config-docker.yaml
+ratelimit:
+  enabled: true
+  store_type: redis  # 生产环境使用redis，开发环境可以使用memory
+  redis_prefix: "ratelimit:"
+  default_config:
+    health_check: "10-S"
+    auth_public: "20-M"
+    auth_protected: "10-M"
+    user_public: "30-M"
+    user_protected: "50-M"
+    custom_api: "100-H"        # 新增：自定义API每小时100次
+  endpoints:
+    "/health": "10-S"
+    "/api/v1/auth/register": "20-M"
+    "/api/v1/auth/login": "20-M"
+    "/api/v1/special": "5-M"   # 新增：特殊端点每分钟5次
+    "/api/v1/upload": "10-H"   # 新增：上传端点每小时10次
+```
+
+**限流格式说明**：
+- `10-S`: 每秒10次
+- `20-M`: 每分钟20次  
+- `100-H`: 每小时100次
+- `1000-D`: 每天1000次
+
+### 添加数据库指标监控
+
+在新的 Repository 层添加数据库指标记录：
+
+```go
+import "distributed-service/pkg/metrics"
+
+// Repository 层示例
+func (r *userRepository) Create(ctx context.Context, user *model.User) error {
+    // 使用 MeasureDatabaseQuery 包装数据库操作
+    err := metrics.MeasureDatabaseQuery("CREATE", "users", func() error {
+        return r.db.WithContext(ctx).Create(user).Error
+    })
+    return err
+}
+
+// 带返回值的查询操作
+func (r *userRepository) GetByID(ctx context.Context, id uint) (*model.User, error) {
+    user, err := metrics.MeasureDatabaseQueryWithResult("SELECT", "users", func() (*model.User, error) {
+        var user model.User
+        err := r.db.WithContext(ctx).First(&user, id).Error
+        return &user, err
+    })
+    return user, err
+}
+```
+
+**指标标签规范**：
+- `operation`: CREATE, SELECT, UPDATE, DELETE
+- `table`: 实际的表名（如：users, orders 等）
 
 ### 配置管理
 
@@ -323,7 +527,13 @@ docker-compose up --build -d
 ### 监控告警
 - 设置 Prometheus 告警规则
 - 配置 Grafana 监控面板
-- 监控关键指标：响应时间、错误率、吞吐量
+- 监控关键指标：响应时间、错误率、吞吐量、数据库性能
+
+### 数据库性能监控
+- 查询响应时间分布
+- 各操作类型（CRUD）的执行频率
+- 表级别的查询统计
+- 慢查询识别和优化
 
 ## 🔒 安全建议
 
@@ -342,6 +552,24 @@ docker-compose up --build -d
    - 设置合理的 Token 过期时间
    - 实现 Token 黑名单机制
    - 添加 API 限流保护
+
+4. **限流安全配置**
+   - 根据业务需求调整限流阈值
+   - 生产环境使用 Redis 存储确保分布式一致性
+   - 监控429状态码的频率，及时调整限流策略
+   - 为重要API设置更严格的限流规则
+
+## 📚 文档导航
+
+| 文档 | 内容 | 适用场景 |
+|------|------|----------|
+| [README.md](README.md) | 项目概览、核心功能、开发指南 | 了解项目、本地开发 |
+| [README-Docker.md](README-Docker.md) | Docker部署、运维、故障排查 | 容器化部署、生产运维 |
+| [TRACING.md](docs/TRACING.md) | 分布式追踪详细说明 | 深入了解追踪功能 |
+| [RATELIMIT.md](docs/RATELIMIT.md) | 限流功能完整文档 | 限流配置和使用 |
+| [RATELIMIT-SUMMARY.md](docs/RATELIMIT-SUMMARY.md) | 限流功能实现总结 | 技术实现详情 |
+| [RATELIMIT-CIRCUITBREAKER.md](docs/RATELIMIT-CIRCUITBREAKER.md) | 限流熔断器详细配置 | 系统保护机制配置 |
+| [Swagger UI](http://localhost:8080/swagger/index.html) | 在线API文档 | API接口调试 |
 
 ## 🤝 贡献指南
 
