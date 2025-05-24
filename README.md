@@ -368,6 +368,45 @@ items.POST("", handler.Create)
 swag init
 ```
 
+### 添加分布式追踪
+
+在新的服务方法中添加追踪：
+
+```go
+// Service 层示例
+func (s *userService) CreateUser(ctx context.Context, user *model.User) error {
+    return tracing.WithSpan(ctx, "userService.CreateUser", func(ctx context.Context) error {
+        // 添加业务属性
+        tracing.AddSpanAttributes(ctx, map[string]interface{}{
+            "user.username": user.Username,
+            "user.email":    user.Email,
+        })
+        
+        // 调用 Repository 层
+        return s.userRepo.Create(ctx, user)
+    })
+}
+
+// Repository 层示例
+func (r *userRepository) Create(ctx context.Context, user *model.User) error {
+    return tracing.TraceDatabase(ctx, "userRepository.Create", "users", "create", func() error {
+        return r.db.Create(user).Error
+    })
+}
+
+// API 层使用请求ID
+func (h *UserHandler) CreateUser(c *gin.Context) {
+    // 中间件已自动添加追踪，只需添加业务属性
+    ctx := c.MustGet("ctx").(context.Context)
+    tracing.AddSpanAttributes(ctx, map[string]interface{}{
+        "api.endpoint": "/api/v1/users",
+        "api.method":   "POST",
+    })
+    
+    // 业务逻辑...
+}
+```
+
 ### 添加限流和熔断器保护
 
 在新的API端点中添加限流和熔断器保护：
@@ -440,12 +479,12 @@ ratelimit:
 
 ### 添加数据库指标监控
 
-在新的 Repository 层添加数据库指标记录：
+在新的数据库操作中添加指标记录：
 
 ```go
 import "distributed-service/pkg/metrics"
 
-// Repository 层示例
+// Repository 层示例 - 添加指标记录
 func (r *userRepository) Create(ctx context.Context, user *model.User) error {
     // 使用 MeasureDatabaseQuery 包装数据库操作
     err := metrics.MeasureDatabaseQuery("CREATE", "users", func() error {
@@ -466,8 +505,23 @@ func (r *userRepository) GetByID(ctx context.Context, id uint) (*model.User, err
 ```
 
 **指标标签规范**：
-- `operation`: CREATE, SELECT, UPDATE, DELETE
-- `table`: 实际的表名（如：users, orders 等）
+- `operation`: 使用标准 CRUD 操作名（CREATE、SELECT、UPDATE、DELETE）
+- `table`: 使用实际的表名（users、orders、products 等）
+
+### 追踪最佳实践
+
+1. **合理命名 Span**: 使用 `service.method` 格式
+2. **添加有意义的属性**: 用户ID、操作类型、资源名称等
+3. **记录错误信息**: 使用 `tracing.RecordError(ctx, err)`
+4. **控制采样率**: 生产环境避免100%采样
+5. **避免敏感信息**: 不要在 span 中记录密码等敏感数据
+
+### 监控最佳实践
+
+1. **数据库指标**: 对所有数据库操作添加指标记录
+2. **合理的标签**: 使用有意义且基数可控的标签
+3. **性能考虑**: 指标收集开销要控制在可接受范围内
+4. **告警配置**: 为关键指标设置合适的告警阈值
 
 ### 配置管理
 
