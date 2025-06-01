@@ -214,6 +214,70 @@ paths:
       summary: Register a new user
       tags:
       - auth
+  /api/v1/grpc/protection/circuit-breaker:
+    get:
+      consumes:
+      - application/json
+      description: Returns the status of all gRPC circuit breakers
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Circuit breaker status
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get gRPC circuit breaker status
+      tags:
+      - monitoring
+  /api/v1/grpc/protection/config:
+    get:
+      consumes:
+      - application/json
+      description: Returns the detailed protection configuration for gRPC services
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Protection configuration
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get gRPC protection configuration
+      tags:
+      - monitoring
+  /api/v1/grpc/protection/rate-limit:
+    get:
+      consumes:
+      - application/json
+      description: Returns the current rate limit configuration and usage
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Rate limit status
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get gRPC rate limit status
+      tags:
+      - monitoring
+  /api/v1/grpc/protection/status:
+    get:
+      consumes:
+      - application/json
+      description: Returns the current status of gRPC rate limiting and circuit breaker
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Protection status
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get gRPC protection status
+      tags:
+      - monitoring
   /api/v1/users:
     post:
       consumes:

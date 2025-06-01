@@ -25,6 +25,24 @@ var (
 		[]string{"method", "endpoint"},
 	)
 
+	// GRPCRequestsTotal gRPC metrics
+	GRPCRequestsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "grpc_requests_total",
+			Help: "Total number of gRPC requests",
+		},
+		[]string{"method", "status"},
+	)
+
+	GRPCRequestDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "grpc_request_duration_seconds",
+			Help:    "gRPC request duration in seconds",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"method", "status"},
+	)
+
 	DatabaseQueryDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "database_query_duration_seconds",

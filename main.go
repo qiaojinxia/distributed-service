@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"distributed-service/internal/api"
+	grpcService "distributed-service/internal/grpc"
 	"distributed-service/internal/model"
 	"distributed-service/internal/repository"
 	"distributed-service/internal/service"
 	"distributed-service/pkg/auth"
 	"distributed-service/pkg/config"
 	"distributed-service/pkg/database"
+	grpcServer "distributed-service/pkg/grpc"
 	"distributed-service/pkg/logger"
 	"distributed-service/pkg/middleware"
 	"distributed-service/pkg/mq"
@@ -24,8 +26,11 @@ import (
 
 	_ "distributed-service/docs" // This is for swagger
 
+	pb "distributed-service/api/proto/user"
+
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"google.golang.org/grpc"
 )
 
 // @title Distributed Service API
@@ -121,13 +126,74 @@ func main() {
 	// Initialize services
 	userService := service.NewUserService(userRepo)
 
+	// Initialize gRPC server
+	grpcConfig, err := grpcServer.ConvertConfig(&config.GlobalConfig.GRPC)
+	if err != nil {
+		logger.Fatal(ctx, "Failed to convert gRPC config", logger.Error_(err))
+	}
+
+	// 创建gRPC拦截器链
+	var unaryInterceptors []grpc.UnaryServerInterceptor
+	var streamInterceptors []grpc.StreamServerInterceptor
+
+	// 1. 基础中间件（来自 common.go）
+	unaryInterceptors = append(unaryInterceptors,
+		middleware.GRPCRecoveryInterceptor(), // 恢复中间件（最先执行）
+		middleware.GRPCLoggingInterceptor(),  // 日志中间件
+		middleware.GRPCMetricsInterceptor(),  // 指标中间件
+	)
+	streamInterceptors = append(streamInterceptors,
+		middleware.GRPCStreamRecoveryInterceptor(), // 流恢复中间件
+		middleware.GRPCStreamLoggingInterceptor(),  // 流日志中间件
+	)
+
+	// 2. Sentinel保护中间件
+	sentinelMiddleware, err := middleware.NewSentinelProtectionMiddleware(ctx, &config.GlobalConfig.Protection)
+	if err != nil {
+		logger.Error(ctx, "Failed to initialize Sentinel middleware", logger.Error_(err))
+	} else if sentinelMiddleware.IsEnabled() {
+		unaryInterceptors = append(unaryInterceptors, sentinelMiddleware.GRPCUnaryInterceptor())
+		streamInterceptors = append(streamInterceptors, sentinelMiddleware.GRPCStreamInterceptor())
+		logger.Info(ctx, "Sentinel protection enabled for gRPC")
+	}
+
+	// 3. 链路追踪中间件（如果启用）
+	if config.GlobalConfig.Tracing.Enabled {
+		unaryInterceptors = append(unaryInterceptors, middleware.GRPCTracingInterceptor())
+		streamInterceptors = append(streamInterceptors, middleware.GRPCStreamTracingInterceptor())
+	}
+
+	// 使用拦截器创建gRPC服务器
+	grpcSrv, err := grpcServer.NewServerWithInterceptors(ctx, grpcConfig, unaryInterceptors, streamInterceptors)
+	if err != nil {
+		logger.Fatal(ctx, "Failed to create gRPC server", logger.Error_(err))
+	}
+
+	// 记录gRPC中间件配置
+	logger.Info(ctx, "gRPC middleware configured",
+		logger.Int("unary_interceptors", len(unaryInterceptors)),
+		logger.Int("stream_interceptors", len(streamInterceptors)),
+		logger.Bool("tracing_enabled", config.GlobalConfig.Tracing.Enabled),
+		logger.String("middleware_chain", "recovery->logging->metrics->tracing->protection"))
+
+	// Register gRPC services
+	userGRPCService := grpcService.NewUserServiceServer(userService, jwtManager)
+	pb.RegisterUserServiceServer(grpcSrv.GetServer(), userGRPCService)
+
+	// Set health status for user service
+	grpcSrv.SetHealthStatus("user.v1.UserService", 1) // SERVING
+
 	// Set Gin mode
 	gin.SetMode(config.GlobalConfig.Server.Mode)
 
-	// Initialize router
-	r := gin.Default()
+	// Initialize router with custom middleware
+	r := gin.New() // 使用空的路由器，手动添加中间件
 
-	// Add context middleware
+	// 1. 基础中间件（来自 common.go）
+	r.Use(middleware.GinRecovery()) // 恢复中间件（最先执行）
+	r.Use(middleware.GinLogger())   // 日志中间件
+
+	// 2. 自定义上下文中间件
 	r.Use(func(c *gin.Context) {
 		// Create request-scoped context with timeout
 		reqCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -142,14 +208,25 @@ func main() {
 		c.Next()
 	})
 
-	// Add tracing middleware
+	// 3. Sentinel保护中间件
+	if sentinelMiddleware != nil && sentinelMiddleware.IsEnabled() {
+		r.Use(sentinelMiddleware.HTTPMiddleware())
+		logger.Info(ctx, "Sentinel protection enabled for HTTP")
+	}
+
+	// 4. 链路追踪中间件（如果启用）
 	if config.GlobalConfig.Tracing.Enabled {
 		r.Use(middleware.TracingMiddleware(config.GlobalConfig.Tracing.ServiceName))
 		r.Use(middleware.CustomTracingMiddleware())
 	}
 
-	// Add metrics middleware
+	// 5. 指标中间件
 	r.Use(middleware.MetricsMiddleware())
+
+	// 记录HTTP中间件配置
+	logger.Info(ctx, "HTTP middleware configured",
+		logger.Bool("tracing_enabled", config.GlobalConfig.Tracing.Enabled),
+		logger.String("middleware_chain", "recovery->logging->context->protection->tracing->metrics"))
 
 	// Register routes with JWT manager
 	api.RegisterRoutes(r, userService, jwtManager)
@@ -180,13 +257,24 @@ func main() {
 
 	// Graceful shutdown
 	go func() {
-		logger.Info(ctx, "Starting server",
+		logger.Info(ctx, "Starting HTTP server",
 			logger.String("address", srv.Addr),
 			logger.String("mode", config.GlobalConfig.Server.Mode),
 		)
 
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Fatal(ctx, "Failed to start server", logger.Error_(err))
+			logger.Fatal(ctx, "Failed to start HTTP server", logger.Error_(err))
+		}
+	}()
+
+	// Start gRPC server
+	go func() {
+		logger.Info(ctx, "Starting gRPC server",
+			logger.Int("port", config.GlobalConfig.GRPC.Port),
+		)
+
+		if err := grpcSrv.Start(ctx); err != nil {
+			logger.Fatal(ctx, "Failed to start gRPC server", logger.Error_(err))
 		}
 	}()
 
@@ -205,9 +293,14 @@ func main() {
 		logger.Error(shutdownCtx, "Failed to deregister service", logger.Error_(err))
 	}
 
-	// Shutdown server
+	// Shutdown gRPC server
+	if err := grpcSrv.Stop(shutdownCtx); err != nil {
+		logger.Error(shutdownCtx, "Failed to shutdown gRPC server", logger.Error_(err))
+	}
+
+	// Shutdown HTTP server
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Fatal(shutdownCtx, "Server forced to shutdown", logger.Error_(err))
+		logger.Fatal(shutdownCtx, "HTTP server forced to shutdown", logger.Error_(err))
 	}
 
 	logger.Info(shutdownCtx, "Server exiting")

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -115,6 +116,22 @@ func String(key, value string) zapcore.Field {
 
 func Int(key string, value int) zapcore.Field {
 	return zap.Int(key, value)
+}
+
+func Int64(key string, value int64) zapcore.Field {
+	return zap.Int64(key, value)
+}
+
+func Bool(key string, value bool) zapcore.Field {
+	return zap.Bool(key, value)
+}
+
+func Duration(key string, value time.Duration) zapcore.Field {
+	return zap.Duration(key, value)
+}
+
+func Any(key string, value interface{}) zapcore.Field {
+	return zap.Any(key, value)
 }
 
 func Error_(err error) zapcore.Field {

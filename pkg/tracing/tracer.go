@@ -8,6 +8,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+	grpccodes "google.golang.org/grpc/codes" // gRPC status codes
 )
 
 const (
@@ -92,6 +93,43 @@ func TraceMessageQueue(ctx context.Context, operation, queue string, messageCoun
 		attribute.Int("mq.message_count", messageCount),
 		attribute.String("mq.system", "rabbitmq"),
 	)
+}
+
+// TraceGRPC 追踪 gRPC 调用的辅助函数
+func TraceGRPC(ctx context.Context, method, service string, statusCode grpccodes.Code) {
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("rpc.system", "grpc"),
+		attribute.String("rpc.service", service),
+		attribute.String("rpc.method", method),
+		attribute.String("rpc.grpc.status_code", statusCode.String()),
+	)
+
+	// Set span status based on gRPC status code
+	if statusCode != grpccodes.OK {
+		span.SetStatus(codes.Error, fmt.Sprintf("gRPC %s", statusCode.String()))
+	} else {
+		span.SetStatus(codes.Ok, "")
+	}
+}
+
+// TraceGRPCClient 追踪 gRPC 客户端调用的辅助函数
+func TraceGRPCClient(ctx context.Context, target, method string, statusCode grpccodes.Code) {
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("rpc.system", "grpc"),
+		attribute.String("rpc.target", target),
+		attribute.String("rpc.method", method),
+		attribute.String("rpc.grpc.status_code", statusCode.String()),
+		attribute.String("component", "grpc-client"),
+	)
+
+	// Set span status based on gRPC status code
+	if statusCode != grpccodes.OK {
+		span.SetStatus(codes.Error, fmt.Sprintf("gRPC %s", statusCode.String()))
+	} else {
+		span.SetStatus(codes.Ok, "")
+	}
 }
 
 // WithSpan 执行函数并自动管理 span 生命周期的辅助函数

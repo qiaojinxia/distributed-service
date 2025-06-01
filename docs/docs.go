@@ -204,6 +204,102 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/grpc/protection/circuit-breaker": {
+            "get": {
+                "description": "Returns the status of all gRPC circuit breakers",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "monitoring"
+                ],
+                "summary": "Get gRPC circuit breaker status",
+                "responses": {
+                    "200": {
+                        "description": "Circuit breaker status",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/grpc/protection/config": {
+            "get": {
+                "description": "Returns the detailed protection configuration for gRPC services",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "monitoring"
+                ],
+                "summary": "Get gRPC protection configuration",
+                "responses": {
+                    "200": {
+                        "description": "Protection configuration",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/grpc/protection/rate-limit": {
+            "get": {
+                "description": "Returns the current rate limit configuration and usage",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "monitoring"
+                ],
+                "summary": "Get gRPC rate limit status",
+                "responses": {
+                    "200": {
+                        "description": "Rate limit status",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/grpc/protection/status": {
+            "get": {
+                "description": "Returns the current status of gRPC rate limiting and circuit breaker",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "monitoring"
+                ],
+                "summary": "Get gRPC protection status",
+                "responses": {
+                    "200": {
+                        "description": "Protection status",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/users": {
             "post": {
                 "description": "Create a new user",

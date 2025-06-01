@@ -5,6 +5,19 @@ server:
   version: v1.0.0
   tags: "myapp,test-server"
 
+grpc:
+  port: 9093
+  max_recv_msg_size: 4194304  # 4MB
+  max_send_msg_size: 4194304  # 4MB
+  connection_timeout: "5s"
+  max_connection_idle: "15s"
+  max_connection_age: "30s"
+  max_connection_age_grace: "5s"
+  time: "5s"
+  timeout: "1s"
+  enable_reflection: true
+  enable_health_check: true
+
 logger:
   level: debug
   encoding: console
@@ -22,7 +35,7 @@ consul:
 
 metrics:
   enabled: true
-  prometheus_port: 9090
+  prometheus_port: 9092
 
 mysql:
   host: localhost
@@ -57,21 +70,141 @@ tracing:
   endpoint: "localhost:14268"  # Jaeger endpoint
   sample_ratio: 1.0  # 1.0 表示采样所有请求，生产环境建议设为 0.1 或更小
 
-ratelimit:
+# 保护机制配置 (限流和熔断) - 统一命名规范
+protection:
   enabled: true
-  store_type: memory  # 本地开发使用内存存储，生产环境使用redis
-  redis_prefix: "ratelimit:"
-  default_config:
-    health_check: "10-S"      # 健康检查：每秒10次
-    auth_public: "20-M"       # 认证公开端点：每分钟20次
-    auth_protected: "10-M"    # 认证保护端点：每分钟10次
-    user_public: "30-M"       # 用户公开API：每分钟30次
-    user_protected: "50-M"    # 用户保护API：每分钟50次
-  endpoints:
-    "/health": "10-S"
-    "/api/v1/auth/register": "20-M"
-    "/api/v1/auth/login": "20-M"
-    "/api/v1/auth/refresh": "20-M"
-    "/api/v1/auth/change-password": "10-M"
-    "/api/v1/users/me": "50-M"
-    "/api/v1/users": "30-M" 
+  
+  # 存储后端配置
+  storage:
+    type: "memory"  # memory, redis, consul
+    prefix: "protection:"
+    ttl: "1h"
+    memory:
+      max_entries: 10000
+      cleanup_tick: "5m"
+  
+  # 限流规则配置 - 简化版本，支持通配符匹配
+  rate_limit_rules:
+    # HTTP API 限流规则
+    - name: "health_check_limiter"
+      resource: "/health"                   # 健康检查接口
+      threshold: 2                          # 1秒内最多2个请求
+      stat_interval_ms: 1000               # 统计窗口1秒
+      enabled: true
+      description: "健康检查接口限流 - 每秒2次 (2 QPS)"
+    
+    - name: "auth_api_limiter"
+      resource: "/api/v1/auth/*"            # 所有认证相关接口
+      threshold: 10                         # 60秒内最多10个请求
+      stat_interval_ms: 60000              # 统计窗口60秒
+      enabled: true
+      description: "认证接口限流 - 每分钟10次 (0.167 QPS)"
+    
+    - name: "users_api_limiter"
+      resource: "/api/v1/users/*"           # 所有用户相关接口
+      threshold: 30                         # 60秒内最多30个请求
+      stat_interval_ms: 60000              # 统计窗口60秒
+      enabled: true
+      description: "用户接口限流 - 每分钟30次 (0.5 QPS)"
+    
+    - name: "api_general_limiter"
+      resource: "/api/*"                    # 所有API接口兜底限流
+      threshold: 100                        # 60秒内最多100个请求
+      stat_interval_ms: 60000              # 统计窗口60秒
+      enabled: true
+      description: "API接口通用限流 - 每分钟100次 (1.67 QPS)"
+    
+    - name: "protection_status_limiter"
+      resource: "/protection/*"             # 保护状态相关接口
+      threshold: 20                         # 1秒内最多20个请求
+      stat_interval_ms: 1000               # 统计窗口1秒
+      enabled: true
+      description: "保护状态接口限流 - 每秒20次 (20 QPS)"
+    
+    # gRPC 服务限流规则 - 简化版本
+    - name: "grpc_user_service_limiter"
+      resource: "/grpc/user_service/*"      # 所有gRPC用户服务方法
+      threshold: 50                         # 1秒内最多50个请求
+      stat_interval_ms: 1000               # 统计窗口1秒
+      enabled: true
+      description: "gRPC用户服务限流 - 每秒50次 (50 QPS)"
+    
+    - name: "grpc_read_operations_limiter"
+      resource: "/grpc/*/get*,/grpc/*/list*,/grpc/*/find*"  # 所有gRPC读操作
+      threshold: 80                         # 1秒内最多80个请求
+      stat_interval_ms: 1000               # 统计窗口1秒
+      enabled: true
+      description: "gRPC读操作限流 - 每秒80次 (80 QPS)"
+    
+    - name: "grpc_write_operations_limiter"
+      resource: "/grpc/*/create*,/grpc/*/update*,/grpc/*/delete*"  # 所有gRPC写操作
+      threshold: 10                         # 60秒内最多10个请求
+      stat_interval_ms: 60000              # 统计窗口60秒
+      enabled: true
+      description: "gRPC写操作限流 - 每分钟10次 (0.167 QPS)"
+  
+  # 熔断器配置 - 简化版本，支持通配符匹配
+  circuit_breakers:
+    # HTTP API 熔断器
+    - name: "auth_api_circuit"
+      resource: "/api/v1/auth/*"            # 所有认证相关接口
+      strategy: "ErrorRatio"                # 错误比例策略
+      retry_timeout_ms: 5000                # 5秒后进入半开状态
+      min_request_amount: 10                # 至少10个请求才统计
+      stat_interval_ms: 10000               # 10秒统计窗口
+      stat_sliding_window_bucket_count: 10  # 10个桶，每桶1秒
+      threshold: 0.5                        # 错误比例达到50%则熔断
+      probe_num: 3                          # 半开状态需要3个探测请求
+      enabled: true
+      description: "认证接口熔断器 - 错误率超过50%时熔断"
+    
+    - name: "users_api_circuit"
+      resource: "/api/v1/users/*"           # 所有用户相关接口
+      strategy: "ErrorRatio"                # 错误比例策略
+      retry_timeout_ms: 3000                # 3秒后进入半开状态
+      min_request_amount: 8                 # 至少8个请求才统计
+      stat_interval_ms: 8000                # 8秒统计窗口
+      stat_sliding_window_bucket_count: 8   # 8个桶，每桶1秒
+      threshold: 0.6                        # 错误比例达到60%则熔断
+      probe_num: 2                          # 半开状态需要2个探测请求
+      enabled: true
+      description: "用户接口熔断器 - 错误率超过60%时熔断"
+    
+    - name: "api_general_circuit"
+      resource: "/api/*"                    # 所有API接口兜底熔断
+      strategy: "ErrorRatio"                # 错误比例策略
+      retry_timeout_ms: 10000               # 10秒后进入半开状态
+      min_request_amount: 20                # 至少20个请求才统计
+      stat_interval_ms: 15000               # 15秒统计窗口
+      stat_sliding_window_bucket_count: 15  # 15个桶，每桶1秒
+      threshold: 0.8                        # 错误比例达到80%则熔断
+      probe_num: 5                          # 半开状态需要5个探测请求
+      enabled: true
+      description: "API接口通用熔断器 - 错误率超过80%时熔断"
+    
+    # gRPC 服务熔断器 - 简化版本
+    - name: "grpc_user_service_circuit"
+      resource: "/grpc/user_service/*"      # 所有gRPC用户服务方法
+      strategy: "SlowRequestRatio"          # 慢调用比例策略
+      max_allowed_rt_ms: 500                # 超过500ms算慢调用
+      retry_timeout_ms: 5000                # 5秒后进入半开状态
+      min_request_amount: 15                # 至少15个请求才统计
+      stat_interval_ms: 15000               # 15秒统计窗口
+      stat_sliding_window_bucket_count: 15  # 15个桶，每桶1秒
+      threshold: 0.3                        # 慢调用比例达到30%则熔断
+      probe_num: 5                          # 半开状态需要5个探测请求
+      enabled: true
+      description: "gRPC用户服务熔断器 - 慢调用比例超过30%时熔断"
+    
+    - name: "grpc_write_operations_circuit"
+      resource: "/grpc/*/create*,/grpc/*/update*,/grpc/*/delete*"  # 所有gRPC写操作
+      strategy: "ErrorRatio"                # 错误比例策略
+      retry_timeout_ms: 8000                # 8秒后进入半开状态
+      min_request_amount: 5                 # 至少5个请求才统计
+      stat_interval_ms: 10000               # 10秒统计窗口
+      stat_sliding_window_bucket_count: 10  # 10个桶，每桶1秒
+      threshold: 0.3                        # 错误比例达到30%则熔断
+      probe_num: 2                          # 半开状态需要2个探测请求
+      enabled: true
+      description: "gRPC写操作熔断器 - 错误率超过30%时熔断"
+    
