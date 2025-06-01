@@ -1,2 +1,29 @@
 /bin/
-./.idea
+# IDE
+.idea/
+*.iml
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+go.work.sum
+
+# Temporary files
+*.tmp
+*.temp
+*~
