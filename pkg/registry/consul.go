@@ -2,13 +2,12 @@ package registry
 
 import (
 	"context"
-	"distributed-service/framework/config"
-	"distributed-service/framework/logger"
 	"fmt"
+	"github.com/hashicorp/consul/api"
+	"github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/framework/logger"
 	"os"
 	"strings"
-
-	"github.com/hashicorp/consul/api"
 )
 
 type ServiceRegistry struct {

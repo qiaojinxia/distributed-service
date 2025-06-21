@@ -2,25 +2,25 @@ package component
 
 import (
 	"context"
-	"distributed-service/framework/auth"
-	"distributed-service/framework/config"
-	"distributed-service/framework/database"
-	"distributed-service/framework/logger"
-	"distributed-service/framework/middleware"
-	"distributed-service/framework/tracing"
-	localgrpc "distributed-service/framework/transport/grpc"
-	"distributed-service/pkg/etcd"
-	"distributed-service/pkg/kafka"
-	"distributed-service/pkg/mq"
-	"distributed-service/pkg/redis_cluster"
-	"distributed-service/pkg/registry"
 	"fmt"
+	"github.com/qiaojinxia/distributed-service/framework/auth"
+	"github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/framework/database"
+	"github.com/qiaojinxia/distributed-service/framework/logger"
+	"github.com/qiaojinxia/distributed-service/framework/middleware"
+	"github.com/qiaojinxia/distributed-service/framework/tracing"
+	localgrpc "github.com/qiaojinxia/distributed-service/framework/transport/grpc"
+	"github.com/qiaojinxia/distributed-service/pkg/etcd"
+	"github.com/qiaojinxia/distributed-service/pkg/kafka"
+	"github.com/qiaojinxia/distributed-service/pkg/mq"
+	"github.com/qiaojinxia/distributed-service/pkg/redis_cluster"
+	"github.com/qiaojinxia/distributed-service/pkg/registry"
 
 	"google.golang.org/grpc"
 )
 
-// ComponentManager 组件管理器 - 统一管理所有组件的生命周期
-type ComponentManager struct {
+// Manager  组件管理器 - 统一管理所有组件的生命周期
+type Manager struct {
 	// 核心组件
 	config     *config.Config
 	auth       *auth.JWTManager
@@ -86,7 +86,7 @@ type Options struct {
 type Option func(*Options)
 
 // NewManager 创建组件管理器
-func NewManager(opts ...Option) *ComponentManager {
+func NewManager(opts ...Option) *Manager {
 	// 默认配置
 	options := &Options{
 		ConfigPath:          "config/config.yaml",
@@ -113,7 +113,7 @@ func NewManager(opts ...Option) *ComponentManager {
 		opt(options)
 	}
 
-	return &ComponentManager{
+	return &Manager{
 		opts: options,
 	}
 }
@@ -296,7 +296,7 @@ func DisableComponent(components ...string) Option {
 // ================================
 
 // Init 初始化所有启用的组件
-func (m *ComponentManager) Init(ctx context.Context) error {
+func (m *Manager) Init(ctx context.Context) error {
 	if m.initialized {
 		return nil
 	}
@@ -421,7 +421,7 @@ func (m *ComponentManager) Init(ctx context.Context) error {
 }
 
 // Start 启动所有组件
-func (m *ComponentManager) Start(ctx context.Context) error {
+func (m *Manager) Start(ctx context.Context) error {
 	if !m.initialized {
 		return fmt.Errorf("components not initialized")
 	}
@@ -445,7 +445,7 @@ func (m *ComponentManager) Start(ctx context.Context) error {
 }
 
 // Stop 停止所有组件
-func (m *ComponentManager) Stop(ctx context.Context) error {
+func (m *Manager) Stop(ctx context.Context) error {
 	if !m.started {
 		return nil
 	}
@@ -475,7 +475,7 @@ func (m *ComponentManager) Stop(ctx context.Context) error {
 // ================================
 
 // initConfig 初始化配置
-func (m *ComponentManager) initConfig(ctx context.Context) error {
+func (m *Manager) initConfig(ctx context.Context) error {
 	if err := config.LoadConfig(m.opts.ConfigPath); err != nil {
 		return fmt.Errorf("load config failed: %w", err)
 	}
@@ -485,7 +485,7 @@ func (m *ComponentManager) initConfig(ctx context.Context) error {
 }
 
 // initLogger 初始化日志
-func (m *ComponentManager) initLogger(ctx context.Context) error {
+func (m *Manager) initLogger(ctx context.Context) error {
 	var cfg *logger.Config
 	if m.opts.LoggerConfig != nil {
 		cfg = &logger.Config{
@@ -515,7 +515,7 @@ func (m *ComponentManager) initLogger(ctx context.Context) error {
 }
 
 // initDatabase 初始化数据库
-func (m *ComponentManager) initDatabase(ctx context.Context) error {
+func (m *Manager) initDatabase(ctx context.Context) error {
 	var cfg *config.MySQLConfig
 	if m.opts.DatabaseConfig != nil {
 		cfg = m.opts.DatabaseConfig
@@ -533,7 +533,7 @@ func (m *ComponentManager) initDatabase(ctx context.Context) error {
 }
 
 // initRedis 初始化Redis
-func (m *ComponentManager) initRedis(ctx context.Context) error {
+func (m *Manager) initRedis(ctx context.Context) error {
 	var cfg *config.RedisConfig
 	if m.opts.RedisConfig != nil {
 		cfg = m.opts.RedisConfig
@@ -551,7 +551,7 @@ func (m *ComponentManager) initRedis(ctx context.Context) error {
 }
 
 // initRedisCluster 初始化Redis集群
-func (m *ComponentManager) initRedisCluster(ctx context.Context) error {
+func (m *Manager) initRedisCluster(ctx context.Context) error {
 	var cfg *config.RedisClusterConfig
 	if m.opts.RedisClusterConfig != nil {
 		cfg = m.opts.RedisClusterConfig
@@ -574,7 +574,7 @@ func (m *ComponentManager) initRedisCluster(ctx context.Context) error {
 }
 
 // initAuth 初始化认证
-func (m *ComponentManager) initAuth(ctx context.Context) error {
+func (m *Manager) initAuth(ctx context.Context) error {
 	var secretKey, issuer string
 	if m.opts.AuthConfig != nil {
 		secretKey = m.opts.AuthConfig.SecretKey
@@ -593,7 +593,7 @@ func (m *ComponentManager) initAuth(ctx context.Context) error {
 }
 
 // initTracing 初始化链路追踪
-func (m *ComponentManager) initTracing(ctx context.Context) error {
+func (m *Manager) initTracing(ctx context.Context) error {
 	var cfg *tracing.Config
 	if m.opts.TracingConfig != nil {
 		cfg = &tracing.Config{
@@ -636,14 +636,14 @@ func (m *ComponentManager) initTracing(ctx context.Context) error {
 }
 
 // initMetrics 初始化监控指标
-func (m *ComponentManager) initMetrics(ctx context.Context) error {
+func (m *Manager) initMetrics(ctx context.Context) error {
 	// 这里可以初始化Prometheus metrics
 	fmt.Println("✅ Metrics initialized")
 	return nil
 }
 
 // initProtection 初始化保护组件
-func (m *ComponentManager) initProtection(ctx context.Context) error {
+func (m *Manager) initProtection(ctx context.Context) error {
 	var cfg *config.ProtectionConfig
 	if m.opts.ProtectionConfig != nil {
 		cfg = m.opts.ProtectionConfig
@@ -663,7 +663,7 @@ func (m *ComponentManager) initProtection(ctx context.Context) error {
 }
 
 // initMQ 初始化消息队列
-func (m *ComponentManager) initMQ(ctx context.Context) error {
+func (m *Manager) initMQ(ctx context.Context) error {
 	var cfg *config.RabbitMQConfig
 	if m.opts.MQConfig != nil {
 		cfg = m.opts.MQConfig
@@ -681,7 +681,7 @@ func (m *ComponentManager) initMQ(ctx context.Context) error {
 }
 
 // initRegistry 初始化服务注册
-func (m *ComponentManager) initRegistry(ctx context.Context) error {
+func (m *Manager) initRegistry(ctx context.Context) error {
 	var cfg *config.ConsulConfig
 	if m.opts.RegistryConfig != nil {
 		cfg = m.opts.RegistryConfig
@@ -701,7 +701,7 @@ func (m *ComponentManager) initRegistry(ctx context.Context) error {
 }
 
 // initGRPCServer 初始化gRPC服务器
-func (m *ComponentManager) initGRPCServer(ctx context.Context) error {
+func (m *Manager) initGRPCServer(ctx context.Context) error {
 	var cfg *localgrpc.Config
 	if m.opts.GRPCConfig != nil {
 		convertedCfg, err := localgrpc.ConvertConfig(m.opts.GRPCConfig)
@@ -764,7 +764,7 @@ func (m *ComponentManager) initGRPCServer(ctx context.Context) error {
 }
 
 // initElasticsearch 初始化Elasticsearch
-func (m *ComponentManager) initElasticsearch(ctx context.Context) error {
+func (m *Manager) initElasticsearch(ctx context.Context) error {
 	var cfg *config.ElasticsearchConfig
 	if m.opts.ElasticsearchConfig != nil {
 		cfg = m.opts.ElasticsearchConfig
@@ -781,7 +781,7 @@ func (m *ComponentManager) initElasticsearch(ctx context.Context) error {
 }
 
 // initKafka 初始化Kafka
-func (m *ComponentManager) initKafka(ctx context.Context) error {
+func (m *Manager) initKafka(ctx context.Context) error {
 	var cfg *config.KafkaConfig
 	if m.opts.KafkaConfig != nil {
 		cfg = m.opts.KafkaConfig
@@ -804,7 +804,7 @@ func (m *ComponentManager) initKafka(ctx context.Context) error {
 }
 
 // initMongoDB 初始化MongoDB
-func (m *ComponentManager) initMongoDB(ctx context.Context) error {
+func (m *Manager) initMongoDB(ctx context.Context) error {
 	var cfg *config.MongoDBConfig
 	if m.opts.MongoDBConfig != nil {
 		cfg = m.opts.MongoDBConfig
@@ -821,7 +821,7 @@ func (m *ComponentManager) initMongoDB(ctx context.Context) error {
 }
 
 // initEtcd 初始化Etcd
-func (m *ComponentManager) initEtcd(ctx context.Context) error {
+func (m *Manager) initEtcd(ctx context.Context) error {
 	var cfg *config.EtcdConfig
 	if m.opts.EtcdConfig != nil {
 		cfg = m.opts.EtcdConfig
@@ -848,41 +848,41 @@ func (m *ComponentManager) initEtcd(ctx context.Context) error {
 // ================================
 
 // GetConfig 获取配置
-func (m *ComponentManager) GetConfig() *config.Config {
+func (m *Manager) GetConfig() *config.Config {
 	return m.config
 }
 
 // GetAuth 获取认证管理器
-func (m *ComponentManager) GetAuth() *auth.JWTManager {
+func (m *Manager) GetAuth() *auth.JWTManager {
 	return m.auth
 }
 
 // GetRegistry 获取服务注册器
-func (m *ComponentManager) GetRegistry() *registry.ServiceRegistry {
+func (m *Manager) GetRegistry() *registry.ServiceRegistry {
 	return m.registry
 }
 
 // GetGRPCServer 获取gRPC服务器
-func (m *ComponentManager) GetGRPCServer() *localgrpc.Server {
+func (m *Manager) GetGRPCServer() *localgrpc.Server {
 	return m.grpcServer
 }
 
 // GetProtection 获取保护中间件
-func (m *ComponentManager) GetProtection() *middleware.SentinelProtectionMiddleware {
+func (m *Manager) GetProtection() *middleware.SentinelProtectionMiddleware {
 	return m.protection
 }
 
 // GetTracing 获取链路追踪
-func (m *ComponentManager) GetTracing() *tracing.Manager {
+func (m *Manager) GetTracing() *tracing.Manager {
 	return m.tracing
 }
 
 // IsInitialized 检查是否已初始化
-func (m *ComponentManager) IsInitialized() bool {
+func (m *Manager) IsInitialized() bool {
 	return m.initialized
 }
 
 // IsStarted 检查是否已启动
-func (m *ComponentManager) IsStarted() bool {
+func (m *Manager) IsStarted() bool {
 	return m.started
 }

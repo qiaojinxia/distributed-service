@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"distributed-service/framework/config"
-	"distributed-service/pkg/etcd"
-	"distributed-service/pkg/kafka"
-	"distributed-service/pkg/redis_cluster"
+	"github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/pkg/etcd"
+	"github.com/qiaojinxia/distributed-service/pkg/kafka"
+	"github.com/qiaojinxia/distributed-service/pkg/redis_cluster"
 )
 
 // RedisClusterPlugin Redis Cluster插件适配器

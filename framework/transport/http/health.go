@@ -3,9 +3,8 @@ package http
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"github.com/gin-gonic/gin"
+	"time"
 )
 
 // HealthStatus 健康状态

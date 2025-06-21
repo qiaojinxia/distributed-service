@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	pb "distributed-service/test/distributed-service/test/proto/order"
+	pb "github.com/qiaojinxia/distributed-service/test/distributed-service/test/proto/order"
 )
 
 // OrderServiceImpl 订单服务实现

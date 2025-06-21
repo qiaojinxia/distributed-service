@@ -328,7 +328,7 @@ GET /scheduler/status
 package main
 
 import (
-    "distributed-service/framework/plugin"
+    "github.com/qiaojinxia/distributed_service/framework/plugin"
     "time"
 )
 

@@ -2,9 +2,9 @@ package database
 
 import (
 	"context"
-	"distributed-service/framework/config"
-	"distributed-service/framework/logger"
 	"fmt"
+	"github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/framework/logger"
 	"time"
 
 	"gorm.io/driver/mysql"

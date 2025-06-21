@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"distributed-service/framework/plugin"
-	httpTransport "distributed-service/framework/transport/http"
+	"github.com/qiaojinxia/distributed-service/framework/plugin"
+	httpTransport "github.com/qiaojinxia/distributed-service/framework/transport/http"
 
 	"github.com/gin-gonic/gin"
 )
@@ -394,44 +394,44 @@ func setupSchedulerRoutes(engine *gin.Engine, schedulerPlugin *plugin.SchedulerP
 // setupEventListeners 设置事件监听器
 func setupEventListeners(manager *plugin.DefaultManager) {
 	// 监听插件生命周期事件
-	manager.SubscribeEvent(plugin.EventPluginStarted, func(event *plugin.Event) error {
+	_ = manager.SubscribeEvent(plugin.EventPluginStarted, func(event *plugin.Event) error {
 		log.Printf("🟢 插件启动: %s", event.Source)
 		return nil
 	})
 
-	manager.SubscribeEvent(plugin.EventPluginStopped, func(event *plugin.Event) error {
+	_ = manager.SubscribeEvent(plugin.EventPluginStopped, func(event *plugin.Event) error {
 		log.Printf("🔴 插件停止: %s", event.Source)
 		return nil
 	})
 
-	manager.SubscribeEvent(plugin.EventPluginFailed, func(event *plugin.Event) error {
+	_ = manager.SubscribeEvent(plugin.EventPluginFailed, func(event *plugin.Event) error {
 		log.Printf("❌ 插件失败: %s - %v", event.Source, event.Data)
 		return nil
 	})
 
 	// 监听定时任务事件
-	manager.SubscribeEvent("scheduler.task.scheduled", func(event *plugin.Event) error {
+	_ = manager.SubscribeEvent("scheduler.task.scheduled", func(event *plugin.Event) error {
 		if taskEvent, ok := event.Data.(*plugin.TaskEvent); ok {
 			log.Printf("📅 任务已调度: %s", taskEvent.TaskName)
 		}
 		return nil
 	})
 
-	manager.SubscribeEvent("scheduler.task.started", func(event *plugin.Event) error {
+	_ = manager.SubscribeEvent("scheduler.task.started", func(event *plugin.Event) error {
 		if taskEvent, ok := event.Data.(*plugin.TaskEvent); ok {
 			log.Printf("▶️  任务开始: %s", taskEvent.TaskName)
 		}
 		return nil
 	})
 
-	manager.SubscribeEvent("scheduler.task.completed", func(event *plugin.Event) error {
+	_ = manager.SubscribeEvent("scheduler.task.completed", func(event *plugin.Event) error {
 		if taskEvent, ok := event.Data.(*plugin.TaskEvent); ok {
 			log.Printf("✅ 任务完成: %s", taskEvent.TaskName)
 		}
 		return nil
 	})
 
-	manager.SubscribeEvent("scheduler.task.failed", func(event *plugin.Event) error {
+	_ = manager.SubscribeEvent("scheduler.task.failed", func(event *plugin.Event) error {
 		if taskEvent, ok := event.Data.(*plugin.TaskEvent); ok {
 			log.Printf("❌ 任务失败: %s - %v", taskEvent.TaskName, taskEvent.Error)
 		}
@@ -439,7 +439,7 @@ func setupEventListeners(manager *plugin.DefaultManager) {
 	})
 
 	// 发布系统启动事件
-	manager.PublishEvent(plugin.NewSystemEvent(plugin.EventSystemStarted, map[string]interface{}{
+	_ = manager.PublishEvent(plugin.NewSystemEvent(plugin.EventSystemStarted, map[string]interface{}{
 		"timestamp": time.Now(),
 		"message":   "Plugin system with scheduler started",
 	}))

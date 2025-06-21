@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"distributed-service/framework/config"
-	"distributed-service/framework/logger"
+	"github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/framework/logger"
 
 	"github.com/go-redis/redis/v8"
 )

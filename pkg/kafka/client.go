@@ -3,12 +3,10 @@ package kafka
 import (
 	"context"
 	"fmt"
-	"time"
-
-	"distributed-service/framework/config"
-	"distributed-service/framework/logger"
-
 	"github.com/Shopify/sarama"
+	"github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/framework/logger"
+	"time"
 )
 
 // Client Kafka客户端
@@ -66,7 +64,7 @@ type MessageHandler func(ctx context.Context, message *Message) error
 // NewClient 创建Kafka客户端
 func NewClient(cfg *Config) (*Client, error) {
 	if cfg == nil {
-		return nil, fmt.Errorf("kafka config is required")
+		return nil, fmt.Errorf("kafka newConfig is required")
 	}
 
 	if len(cfg.Brokers) == 0 {
@@ -74,67 +72,67 @@ func NewClient(cfg *Config) (*Client, error) {
 	}
 
 	// 创建Sarama配置
-	config := sarama.NewConfig()
-	config.ClientID = cfg.ClientID
+	newConfig := sarama.NewConfig()
+	newConfig.ClientID = cfg.ClientID
 
 	// 设置版本 - 使用较新但稳定的版本
 	if cfg.Version != "" {
 		version, err := sarama.ParseKafkaVersion(cfg.Version)
 		if err == nil {
-			config.Version = version
+			newConfig.Version = version
 		}
 	}
 
 	// 网络配置
-	config.Net.DialTimeout = 30 * time.Second
-	config.Net.ReadTimeout = 30 * time.Second
-	config.Net.WriteTimeout = 30 * time.Second
+	newConfig.Net.DialTimeout = 30 * time.Second
+	newConfig.Net.ReadTimeout = 30 * time.Second
+	newConfig.Net.WriteTimeout = 30 * time.Second
 
 	// SASL配置
 	if cfg.SASL.Enable {
-		config.Net.SASL.Enable = true
-		config.Net.SASL.User = cfg.SASL.Username
-		config.Net.SASL.Password = cfg.SASL.Password
+		newConfig.Net.SASL.Enable = true
+		newConfig.Net.SASL.User = cfg.SASL.Username
+		newConfig.Net.SASL.Password = cfg.SASL.Password
 		// 简化SASL配置，避免版本兼容问题
 	}
 
 	// TLS配置
 	if cfg.TLS.Enable {
-		config.Net.TLS.Enable = true
+		newConfig.Net.TLS.Enable = true
 	}
 
 	// 生产者配置
 	if cfg.RetryMax > 0 {
-		config.Producer.Retry.Max = cfg.RetryMax
+		newConfig.Producer.Retry.Max = cfg.RetryMax
 	} else {
-		config.Producer.Retry.Max = 3
+		newConfig.Producer.Retry.Max = 3
 	}
 
 	if cfg.RetryBackoff > 0 {
-		config.Producer.Retry.Backoff = time.Duration(cfg.RetryBackoff) * time.Millisecond
+		newConfig.Producer.Retry.Backoff = time.Duration(cfg.RetryBackoff) * time.Millisecond
 	}
 
-	config.Producer.Return.Successes = true
-	config.Producer.Return.Errors = true
+	newConfig.Producer.Return.Successes = true
+	newConfig.Producer.Return.Errors = true
 
 	if cfg.FlushMessages > 0 {
-		config.Producer.Flush.Messages = cfg.FlushMessages
+		newConfig.Producer.Flush.Messages = cfg.FlushMessages
 	}
 
 	if cfg.FlushBytes > 0 {
-		config.Producer.Flush.Bytes = cfg.FlushBytes
+		newConfig.Producer.Flush.Bytes = cfg.FlushBytes
 	}
 
 	if cfg.FlushTimeout > 0 {
-		config.Producer.Flush.Frequency = time.Duration(cfg.FlushTimeout) * time.Millisecond
+		newConfig.Producer.Flush.Frequency = time.Duration(cfg.FlushTimeout) * time.Millisecond
 	}
 
 	// 消费者配置
-	config.Consumer.Return.Errors = true
-	config.Consumer.Offsets.Initial = sarama.OffsetNewest
+	newConfig.Consumer.Return.Errors = true
+	newConfig.Consumer.Offsets.Initial = sarama.OffsetNewest
 
 	// 创建客户端
-	client, err := sarama.NewClient(cfg.Brokers, config)
+	client, err := sarama.NewClient(cfg.Brokers, newConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kafka client: %w", err)
 	}
@@ -385,7 +383,7 @@ func ConvertConfig(cfg *config.KafkaConfig) (*Config, error) {
 var globalClient *Client
 
 // InitKafka 初始化Kafka客户端
-func InitKafka(ctx context.Context, cfg *Config) error {
+func InitKafka(_ context.Context, cfg *Config) error {
 	client, err := NewClient(cfg)
 	if err != nil {
 		return err

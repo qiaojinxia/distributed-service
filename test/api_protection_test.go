@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"distributed-service/framework/config"
-	"distributed-service/framework/logger"
-	"distributed-service/framework/middleware"
+	"github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/framework/logger"
+	"github.com/qiaojinxia/distributed-service/framework/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"

@@ -3,10 +3,10 @@ package lock
 import (
 	"context"
 	"crypto/rand"
-	"distributed-service/framework/logger"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/qiaojinxia/distributed-service/framework/logger"
 	"time"
 
 	"github.com/go-redis/redis/v8"

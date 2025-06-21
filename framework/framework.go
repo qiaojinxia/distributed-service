@@ -1,7 +1,7 @@
 package framework
 
 import (
-	"distributed-service/framework/app"
+	"github.com/qiaojinxia/distributed-service/framework/app"
 )
 
 // 🚀 分布式服务框架 - 主API

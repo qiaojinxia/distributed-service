@@ -3,9 +3,8 @@ package test
 import (
 	"context"
 	"fmt"
+	pb "github.com/qiaojinxia/distributed-service/test/distributed-service/test/proto/user"
 	"time"
-
-	pb "distributed-service/test/distributed-service/test/proto/user"
 )
 
 // UserServiceImpl 用户服务实现

@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
-	"distributed-service/framework"
-	"distributed-service/framework/config"
-	httpTransport "distributed-service/framework/transport/http"
-	"distributed-service/pkg/etcd"
-	"distributed-service/pkg/kafka"
-	"distributed-service/pkg/redis_cluster"
 	"log"
 	"time"
+
+	"github.com/qiaojinxia/distributed-service/framework"
+	"github.com/qiaojinxia/distributed-service/framework/config"
+	httpTransport "github.com/qiaojinxia/distributed-service/framework/transport/http"
+	"github.com/qiaojinxia/distributed-service/pkg/etcd"
+	"github.com/qiaojinxia/distributed-service/pkg/kafka"
+	"github.com/qiaojinxia/distributed-service/pkg/redis_cluster"
 
 	"github.com/gin-gonic/gin"
 )
@@ -62,30 +63,6 @@ func main() {
 			FlushMessages: 100,
 			FlushBytes:    1024 * 1024,
 			FlushTimeout:  100,
-
-			SASL: struct {
-				Enable    bool   `mapstructure:"enable" json:"enable"`
-				Mechanism string `mapstructure:"mechanism" json:"mechanism"`
-				Username  string `mapstructure:"username" json:"username"`
-				Password  string `mapstructure:"password" json:"password"`
-			}{
-				Enable:    false,
-				Mechanism: "PLAIN",
-				Username:  "",
-				Password:  "",
-			},
-
-			TLS: struct {
-				Enable   bool   `mapstructure:"enable" json:"enable"`
-				CertFile string `mapstructure:"cert_file" json:"cert_file"`
-				KeyFile  string `mapstructure:"key_file" json:"key_file"`
-				CAFile   string `mapstructure:"ca_file" json:"ca_file"`
-			}{
-				Enable:   false,
-				CertFile: "",
-				KeyFile:  "",
-				CAFile:   "",
-			},
 		}).
 
 		// 🔑 Etcd配置
@@ -94,18 +71,6 @@ func main() {
 			Username:    "",
 			Password:    "",
 			DialTimeout: 5,
-
-			TLS: struct {
-				Enable   bool   `mapstructure:"enable" json:"enable"`
-				CertFile string `mapstructure:"cert_file" json:"cert_file"`
-				KeyFile  string `mapstructure:"key_file" json:"key_file"`
-				CAFile   string `mapstructure:"ca_file" json:"ca_file"`
-			}{
-				Enable:   false,
-				CertFile: "",
-				KeyFile:  "",
-				CAFile:   "",
-			},
 		}).
 
 		// 🌐 HTTP服务配置

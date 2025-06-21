@@ -1,11 +1,10 @@
 package middleware
 
 import (
+	"github.com/gin-gonic/gin"
 	"net/http"
 	"runtime"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
 // MonitorConfig 监控配置

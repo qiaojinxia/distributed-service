@@ -2,8 +2,8 @@ package auth
 
 import (
 	"context"
-	"distributed-service/framework/logger"
 	"errors"
+	"github.com/qiaojinxia/distributed-service/framework/logger"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"

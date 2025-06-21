@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"distributed-service/framework/config"
-	"distributed-service/framework/logger"
-	"distributed-service/framework/middleware"
-	orderPb "distributed-service/test/distributed-service/test/proto/order"
-	userPb "distributed-service/test/distributed-service/test/proto/user"
+	"github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/framework/logger"
+	"github.com/qiaojinxia/distributed-service/framework/middleware"
+	orderPb "github.com/qiaojinxia/distributed-service/test/distributed-service/test/proto/order"
+	userPb "github.com/qiaojinxia/distributed-service/test/distributed-service/test/proto/user"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

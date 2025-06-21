@@ -2,13 +2,12 @@ package middleware
 
 import (
 	"context"
-	"distributed-service/framework/logger"
-	"distributed-service/framework/auth"
 	"errors"
+	"github.com/gin-gonic/gin"
+	"github.com/qiaojinxia/distributed-service/framework/auth"
+	"github.com/qiaojinxia/distributed-service/framework/logger"
 	"net/http"
 	"strings"
-
-	"github.com/gin-gonic/gin"
 )
 
 // JWTAuth creates a JWT authentication middleware

@@ -2,9 +2,8 @@ package grpc
 
 import (
 	"fmt"
+	"github.com/qiaojinxia/distributed-service/framework/config"
 	"time"
-
-	"distributed-service/framework/config"
 )
 
 // ConvertConfig converts config.GRPCConfig to grpc.Config

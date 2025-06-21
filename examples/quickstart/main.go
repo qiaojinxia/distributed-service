@@ -1,7 +1,7 @@
 package main
 
 import (
-	"distributed-service/framework"
+	"github.com/qiaojinxia/distributed-service/framework"
 	"log"
 )
 

@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"distributed-service/framework"
-	"distributed-service/framework/config"
-	httpTransport "distributed-service/framework/transport/http"
+	"github.com/qiaojinxia/distributed-service/framework"
+	"github.com/qiaojinxia/distributed-service/framework/config"
+	httpTransport "github.com/qiaojinxia/distributed-service/framework/transport/http"
 	"log"
 
 	"github.com/gin-gonic/gin"

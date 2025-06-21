@@ -3,12 +3,10 @@ package etcd
 import (
 	"context"
 	"fmt"
-	"time"
-
-	"distributed-service/framework/config"
-	"distributed-service/framework/logger"
-
+	"github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/framework/logger"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"time"
 )
 
 // Client Etcd客户端

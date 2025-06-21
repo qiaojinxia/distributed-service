@@ -2,9 +2,8 @@ package middleware
 
 import (
 	"context"
-	"distributed-service/framework/tracing"
-
 	"github.com/gin-gonic/gin"
+	"github.com/qiaojinxia/distributed-service/framework/tracing"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"

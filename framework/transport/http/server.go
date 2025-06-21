@@ -4,14 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/framework/logger"
+	"github.com/qiaojinxia/distributed-service/framework/middleware"
 	"net/http"
 	"time"
-
-	"distributed-service/framework/config"
-	"distributed-service/framework/logger"
-	"distributed-service/framework/middleware"
-
-	"github.com/gin-gonic/gin"
 )
 
 // Server HTTP服务器

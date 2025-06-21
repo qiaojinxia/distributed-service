@@ -3,16 +3,15 @@ package monitor
 import (
 	"context"
 	"fmt"
-	"net"
-	"os"
-	"runtime"
-	"time"
-
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/mem"
 	psnet "github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
+	"net"
+	"os"
+	"runtime"
+	"time"
 )
 
 // SystemStats represents system resource statistics

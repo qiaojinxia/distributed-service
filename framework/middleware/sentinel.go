@@ -3,21 +3,18 @@ package middleware
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"strings"
-
 	sentinel "github.com/alibaba/sentinel-golang/api"
 	"github.com/alibaba/sentinel-golang/core/base"
-
-	"distributed-service/framework/config"
-	"distributed-service/framework/logger"
-	"distributed-service/framework/protection"
-
 	"github.com/gin-gonic/gin"
+	"github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/framework/logger"
+	"github.com/qiaojinxia/distributed-service/framework/protection"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"net/http"
+	"strings"
 )
 
 // SentinelProtectionMiddleware Sentinel保护中间件

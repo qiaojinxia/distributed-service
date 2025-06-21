@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"distributed-service/framework"
+	"github.com/qiaojinxia/distributed-service/framework"
 	"log"
 )
 

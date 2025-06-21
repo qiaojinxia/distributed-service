@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"distributed-service/framework/config"
-	"distributed-service/framework/protection"
+	"github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/framework/protection"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

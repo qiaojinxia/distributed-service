@@ -2,9 +2,9 @@ package app
 
 import (
 	"context"
-	"distributed-service/framework/component"
-	"distributed-service/framework/config"
 	"fmt"
+	"github.com/qiaojinxia/distributed-service/framework/component"
+	"github.com/qiaojinxia/distributed-service/framework/config"
 	"os"
 	"strconv"
 	"strings"
@@ -21,7 +21,7 @@ type Builder struct {
 	grpcHandlers []GRPCHandler
 
 	// 组件管理器
-	componentManager *component.ComponentManager
+	componentManager *component.Manager
 
 	// 自动检测标志
 	autoDetect bool
@@ -533,7 +533,7 @@ func defaultHTTPHandler(r interface{}) {
 // ================================
 
 // GetComponentManager 获取组件管理器
-func (b *Builder) GetComponentManager() *component.ComponentManager {
+func (b *Builder) GetComponentManager() *component.Manager {
 	return b.componentManager
 }
 
@@ -591,7 +591,7 @@ func getEnvBool(key string, defaultValue bool) bool {
 
 // ComponentWrapper 组件管理器的包装器，实现Component接口
 type ComponentWrapper struct {
-	manager *component.ComponentManager
+	manager *component.Manager
 }
 
 func (c *ComponentWrapper) Name() string {

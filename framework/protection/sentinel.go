@@ -2,22 +2,20 @@ package protection
 
 import (
 	"context"
-	"distributed-service/framework/logger"
 	"fmt"
-	"path/filepath"
-	"sort"
-	"strings"
-	"time"
-
 	sentinel "github.com/alibaba/sentinel-golang/api"
 	"github.com/alibaba/sentinel-golang/core/base"
 	"github.com/alibaba/sentinel-golang/core/circuitbreaker"
 	"github.com/alibaba/sentinel-golang/core/config"
 	"github.com/alibaba/sentinel-golang/core/flow"
 	"github.com/alibaba/sentinel-golang/logging"
+	appconfig "github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/framework/logger"
 	"go.uber.org/zap"
-
-	appconfig "distributed-service/framework/config"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
 )
 
 // ResourceMatcher 资源匹配器，支持通配符匹配

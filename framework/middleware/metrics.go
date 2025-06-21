@@ -1,11 +1,10 @@
 package middleware
 
 import (
-	"distributed-service/framework/metrics"
+	"github.com/gin-gonic/gin"
+	"github.com/qiaojinxia/distributed-service/framework/metrics"
 	"strconv"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
 func MetricsMiddleware() gin.HandlerFunc {

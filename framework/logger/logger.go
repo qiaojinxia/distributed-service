@@ -3,11 +3,10 @@ package logger
 import (
 	"context"
 	"fmt"
-	"os"
-	"time"
-
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"os"
+	"time"
 )
 
 var globalLogger *zap.Logger

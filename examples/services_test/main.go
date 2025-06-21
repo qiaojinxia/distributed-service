@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
-	"distributed-service/framework"
-	"distributed-service/framework/config"
-	httpTransport "distributed-service/framework/transport/http"
-	"distributed-service/pkg/etcd"
-	"distributed-service/pkg/kafka"
-	"distributed-service/pkg/redis_cluster"
+	"github.com/qiaojinxia/distributed-service/framework"
+	"github.com/qiaojinxia/distributed-service/framework/config"
+	httpTransport "github.com/qiaojinxia/distributed-service/framework/transport/http"
+	"github.com/qiaojinxia/distributed-service/pkg/etcd"
+	"github.com/qiaojinxia/distributed-service/pkg/kafka"
+	"github.com/qiaojinxia/distributed-service/pkg/redis_cluster"
 	"log"
 	"time"
 
