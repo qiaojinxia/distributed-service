@@ -113,6 +113,656 @@ go build -v
 - **任务调度**: http://localhost:8080/scheduler/tasks
 - **任务演示**: http://localhost:8080/demo/scheduler
 
+## 📖 框架基础使用
+
+本框架提供了完整的分布式服务基础设施，支持HTTP REST API、gRPC服务、统一日志记录、配置管理等核心功能。
+
+### 🚀 最简单的开始
+
+```go
+package main
+
+import (
+    "github.com/qiaojinxia/distributed-service/framework"
+)
+
+func main() {
+    // 零配置启动 - 自动检测环境配置
+    framework.Start()
+}
+```
+
+### 🌐 HTTP服务
+
+#### 基础HTTP服务
+
+```go
+package main
+
+import (
+    "context"
+    "github.com/gin-gonic/gin"
+    "github.com/qiaojinxia/distributed-service/framework"
+    "github.com/qiaojinxia/distributed-service/framework/logger"
+)
+
+func main() {
+    err := framework.New().
+        Port(8080).                    // 设置端口
+        Name("my-api-service").        // 服务名称
+        Version("v1.0.0").            // 版本号
+        Mode("debug").                // 运行模式 (debug/release/test)
+        OnlyHTTP().                   // 只启用HTTP服务
+        HTTP(setupRoutes).            // 注册路由
+        BeforeStart(func(ctx context.Context) error {
+            logger.GetLogger().Info("🔧 服务初始化中...")
+            return nil
+        }).
+        AfterStart(func(ctx context.Context) error {
+            logger.GetLogger().Info("✅ HTTP服务启动完成!")
+            logger.GetLogger().Info("🌐 访问地址: http://localhost:8080")
+            return nil
+        }).
+        Run()
+    
+    if err != nil {
+        logger.GetLogger().Fatal("服务启动失败", logger.Any("error", err))
+    }
+}
+
+// 设置路由
+func setupRoutes(r interface{}) {
+    router := r.(*gin.Engine)
+    
+    // 健康检查
+    router.GET("/health", func(c *gin.Context) {
+        c.JSON(200, gin.H{
+            "status": "ok",
+            "service": "my-api-service",
+            "version": "v1.0.0",
+        })
+    })
+    
+    // API路由组
+    api := router.Group("/api/v1")
+    {
+        api.GET("/users", getUserList)
+        api.GET("/users/:id", getUserByID)
+        api.POST("/users", createUser)
+        api.PUT("/users/:id", updateUser)
+        api.DELETE("/users/:id", deleteUser)
+    }
+}
+
+func getUserList(c *gin.Context) {
+    c.JSON(200, gin.H{
+        "users": []gin.H{
+            {"id": 1, "name": "Alice", "email": "alice@example.com"},
+            {"id": 2, "name": "Bob", "email": "bob@example.com"},
+        },
+        "total": 2,
+    })
+}
+
+func getUserByID(c *gin.Context) {
+    id := c.Param("id")
+    c.JSON(200, gin.H{
+        "id": id,
+        "name": "User " + id,
+        "email": "user" + id + "@example.com",
+    })
+}
+
+func createUser(c *gin.Context) {
+    // 处理用户创建逻辑
+    c.JSON(201, gin.H{"message": "User created successfully"})
+}
+
+func updateUser(c *gin.Context) {
+    // 处理用户更新逻辑
+    id := c.Param("id")
+    c.JSON(200, gin.H{"message": "User " + id + " updated successfully"})
+}
+
+func deleteUser(c *gin.Context) {
+    // 处理用户删除逻辑
+    id := c.Param("id")
+    c.JSON(200, gin.H{"message": "User " + id + " deleted successfully"})
+}
+```
+
+#### 快速Web服务
+
+```go
+// 使用便捷方法启动Web服务
+framework.Web(8080, func(r *gin.Engine) {
+    r.GET("/", func(c *gin.Context) {
+        c.JSON(200, gin.H{"message": "Hello World!"})
+    })
+    
+    r.GET("/api/status", func(c *gin.Context) {
+        c.JSON(200, gin.H{"status": "running"})
+    })
+})
+```
+
+### 🔌 gRPC服务
+
+#### 基础gRPC服务
+
+```go
+package main
+
+import (
+    "context"
+    "github.com/qiaojinxia/distributed-service/framework"
+    "github.com/qiaojinxia/distributed-service/framework/logger"
+    "google.golang.org/grpc"
+)
+
+func main() {
+    err := framework.New().
+        Port(8080).                     // HTTP端口 (用于健康检查等)
+        Name("my-grpc-service").        // 服务名称
+        Version("v1.0.0").             // 版本号
+        Mode("debug").                 // 运行模式
+        OnlyGRPC().                    // 只启用gRPC服务
+        GRPC(setupGRPCServices).       // 注册gRPC服务
+        BeforeStart(func(ctx context.Context) error {
+            logger.GetLogger().Info("🔧 gRPC服务初始化中...")
+            return nil
+        }).
+        AfterStart(func(ctx context.Context) error {
+            logger.GetLogger().Info("✅ gRPC服务启动完成!")
+            logger.GetLogger().Info("🔌 gRPC监听地址: localhost:9093")
+            return nil
+        }).
+        Run()
+    
+    if err != nil {
+        logger.GetLogger().Fatal("gRPC服务启动失败", logger.Any("error", err))
+    }
+}
+
+// 设置gRPC服务
+func setupGRPCServices(s interface{}) {
+    server := s.(*grpc.Server)
+    
+    // 注册自定义gRPC服务
+    // pb.RegisterUserServiceServer(server, &userService{})
+    // pb.RegisterOrderServiceServer(server, &orderService{})
+    
+    logger.GetLogger().Info("🔌 gRPC服务注册完成")
+    logger.GetLogger().Info("  ✅ HealthCheck服务 (自动注册)")
+    logger.GetLogger().Info("  ✅ Server Reflection (自动注册)")
+}
+```
+
+#### 快速微服务
+
+```go
+// 使用便捷方法启动微服务
+framework.Micro(9000, func(s *grpc.Server) {
+    // 注册你的gRPC服务
+    // pb.RegisterMyServiceServer(s, &myServiceImpl{})
+    
+    log.Println("🔌 微服务注册完成")
+})
+```
+
+### 🔄 HTTP + gRPC 双服务
+
+```go
+package main
+
+import (
+    "context"
+    "github.com/gin-gonic/gin"
+    "github.com/qiaojinxia/distributed-service/framework"
+    "github.com/qiaojinxia/distributed-service/framework/logger"
+    "google.golang.org/grpc"
+)
+
+func main() {
+    err := framework.New().
+        Port(8080).                     // HTTP端口
+        Name("full-service").           // 服务名称
+        Version("v1.0.0").             // 版本号
+        Mode("debug").                 // 运行模式
+        EnableAll().                   // 启用所有服务 (HTTP + gRPC + Metrics + Tracing)
+        HTTP(setupHTTPRoutes).         // 注册HTTP路由
+        GRPC(setupGRPCServices).       // 注册gRPC服务
+        BeforeStart(func(ctx context.Context) error {
+            logger.GetLogger().Info("🔧 初始化完整服务...")
+            return nil
+        }).
+        AfterStart(func(ctx context.Context) error {
+            log := logger.GetLogger()
+            log.Info("✅ 完整服务启动完成!")
+            log.Info("🌐 HTTP服务: http://localhost:8080")
+            log.Info("🔌 gRPC服务: localhost:9093")
+            log.Info("📊 健康检查: http://localhost:8080/health")
+            log.Info("📈 监控指标: http://localhost:9092/metrics")
+            return nil
+        }).
+        Run()
+    
+    if err != nil {
+        logger.GetLogger().Fatal("完整服务启动失败", logger.Any("error", err))
+    }
+}
+
+func setupHTTPRoutes(r interface{}) {
+    router := r.(*gin.Engine)
+    
+    // 健康检查
+    router.GET("/health", func(c *gin.Context) {
+        c.JSON(200, gin.H{
+            "status": "ok",
+            "services": gin.H{
+                "http": "running",
+                "grpc": "running",
+            },
+        })
+    })
+    
+    // REST API
+    api := router.Group("/api/v1")
+    {
+        api.GET("/users", func(c *gin.Context) {
+            // 可以调用gRPC服务获取数据
+            c.JSON(200, gin.H{"users": []string{"alice", "bob"}})
+        })
+    }
+}
+
+func setupGRPCServices(s interface{}) {
+    server := s.(*grpc.Server)
+    
+    // 注册业务gRPC服务
+    // pb.RegisterUserServiceServer(server, &userServiceImpl{})
+    
+    logger.GetLogger().Info("🔌 gRPC服务注册完成")
+}
+```
+
+### 📋 统一日志系统
+
+框架提供了统一的结构化日志系统，自动包含时间戳、日志级别、来源信息等。
+
+#### 基础日志使用
+
+```go
+package main
+
+import (
+    "github.com/qiaojinxia/distributed-service/framework/logger"
+)
+
+func main() {
+    // 获取全局logger实例
+    log := logger.GetLogger()
+    
+    // 基础日志记录
+    log.Info("应用程序启动")
+    log.Warn("这是一个警告消息")
+    log.Error("发生了错误")
+    
+    // 结构化日志 - 推荐方式
+    log.Info("用户登录", 
+        logger.String("user_id", "12345"),
+        logger.String("ip", "192.168.1.1"),
+        logger.Int("attempts", 3))
+    
+    // 错误日志
+    err := errors.New("数据库连接失败")
+    log.Error("数据库操作失败", 
+        logger.Any("error", err),
+        logger.String("operation", "user_query"),
+        logger.Duration("timeout", 5*time.Second))
+    
+    // 致命错误（会退出程序）
+    log.Fatal("无法启动服务", logger.Any("error", err))
+}
+```
+
+#### 日志级别
+
+```go
+// 支持的日志级别
+log.Debug("调试信息")    // 开发环境详细信息
+log.Info("信息日志")     // 一般信息
+log.Warn("警告日志")     // 警告信息
+log.Error("错误日志")    // 错误信息
+log.Fatal("致命错误")    // 致命错误，程序退出
+```
+
+#### 上下文日志
+
+```go
+import (
+    "context"
+    "github.com/qiaojinxia/distributed-service/framework/logger"
+)
+
+func businessHandler(ctx context.Context) {
+    // 从上下文获取logger
+    log := logger.GetLogger()
+    
+    // 带上下文的日志记录
+    log.Info("处理业务请求", 
+        logger.String("request_id", "req-123"),
+        logger.String("user_id", "user-456"))
+    
+    // 在函数中传递context
+    processOrder(ctx, "order-789")
+}
+
+func processOrder(ctx context.Context, orderID string) {
+    log := logger.GetLogger()
+    
+    log.Info("开始处理订单", 
+        logger.String("order_id", orderID))
+    
+    // 业务逻辑...
+    
+    log.Info("订单处理完成", 
+        logger.String("order_id", orderID),
+        logger.String("status", "completed"))
+}
+```
+
+### ⚙️ 配置文件使用
+
+框架支持YAML格式的配置文件，提供丰富的配置选项。
+
+#### 基础配置文件 (`config/config.yaml`)
+
+```yaml
+# 服务配置
+server:
+  port: 8080                        # HTTP端口
+  mode: debug                       # 运行模式: debug/release/test
+  name: my-service                  # 服务名称
+  version: v1.0.0                   # 服务版本
+  tags: "api,microservice"          # 服务标签
+
+# gRPC配置  
+grpc:
+  port: 9093                        # gRPC端口
+  max_recv_msg_size: 4194304        # 最大接收消息大小 (4MB)
+  max_send_msg_size: 4194304        # 最大发送消息大小 (4MB)
+  connection_timeout: "5s"          # 连接超时
+  enable_reflection: true           # 启用反射服务
+  enable_health_check: true         # 启用健康检查
+
+# 日志配置
+logger:
+  level: debug                      # 日志级别: debug/info/warn/error
+  encoding: console                 # 编码格式: console/json
+  output_path: stdout               # 输出路径: stdout/文件路径
+
+# JWT认证配置
+jwt:
+  secret_key: "your-secret-key"     # JWT密钥
+  issuer: "my-service"              # 发行者
+
+# MySQL数据库配置
+mysql:
+  host: localhost
+  port: 3306
+  username: root
+  password: root
+  database: my_database
+  charset: utf8mb4
+  max_idle_conns: 10               # 最大空闲连接数
+  max_open_conns: 100              # 最大打开连接数
+
+# Redis配置
+redis:
+  host: localhost
+  port: 6379
+  password: ""                     # Redis密码
+  db: 0                           # 数据库编号
+  pool_size: 100                  # 连接池大小
+
+# 监控指标配置
+metrics:
+  enabled: true                    # 启用监控
+  prometheus_port: 9092           # Prometheus端口
+
+# 链路追踪配置
+tracing:
+  service_name: my-service        # 服务名称
+  service_version: v1.0.0         # 服务版本
+  environment: development        # 环境
+  enabled: true                   # 启用追踪
+  exporter_type: stdout           # 导出器类型: stdout/otlp
+  sample_ratio: 1.0               # 采样比例 (0.0-1.0)
+```
+
+#### 使用配置文件
+
+```go
+package main
+
+import (
+    "github.com/qiaojinxia/distributed-service/framework"
+)
+
+func main() {
+    err := framework.New().
+        Config("config/config.yaml").   // 指定配置文件
+        AutoDetect().                   // 自动检测环境变量
+        HTTP(setupRoutes).
+        Run()
+    
+    if err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+#### 环境变量配置
+
+```bash
+# 通过环境变量覆盖配置
+export PORT=8080
+export GIN_MODE=release
+export CONFIG_PATH=config/production.yaml
+export APP_NAME=my-production-service
+
+# 启动应用
+./my-service
+```
+
+### 🔧 组件配置选项
+
+#### 选择性启用组件
+
+```go
+// 最小化配置 - 只启用必要组件
+framework.New().
+    Port(8080).
+    OnlyHTTP().                    // 只启用HTTP
+    DisableComponents("metrics", "tracing").  // 禁用指定组件
+    HTTP(setupRoutes).
+    Run()
+
+// 自定义组件配置
+framework.New().
+    Port(8080).
+    Enable("http", "metrics").     // 只启用HTTP和监控
+    Disable("grpc", "tracing").    // 禁用gRPC和追踪
+    HTTP(setupRoutes).
+    Run()
+
+// 完整功能
+framework.New().
+    Port(8080).
+    EnableAll().                   // 启用所有组件
+    HTTP(setupRoutes).
+    GRPC(setupGRPCServices).
+    Run()
+```
+
+#### 开发模式快捷配置
+
+```go
+// 开发模式
+framework.New().
+    Dev().                         // 8080端口，debug模式
+    HTTP(setupRoutes).
+    Run()
+
+// 生产模式  
+framework.New().
+    Prod().                        // 80端口，release模式
+    HTTP(setupRoutes).
+    Run()
+
+// 测试模式
+framework.New().
+    Test().                        // 随机端口，test模式，只启用HTTP
+    HTTP(setupRoutes).
+    Run()
+```
+
+### 🛠️ 生命周期钩子
+
+框架提供了完整的生命周期钩子，方便在不同阶段执行自定义逻辑。
+
+```go
+err := framework.New().
+    Port(8080).
+    // 启动前回调
+    BeforeStart(func(ctx context.Context) error {
+        log.Info("🔧 执行启动前初始化...")
+        // 初始化数据库连接
+        // 加载配置文件
+        // 预热缓存
+        return nil
+    }).
+    // 启动后回调
+    AfterStart(func(ctx context.Context) error {
+        log.Info("✅ 服务启动完成!")
+        // 注册到服务发现
+        // 启动后台任务
+        // 发送启动通知
+        return nil
+    }).
+    // 停止前回调
+    BeforeStop(func(ctx context.Context) error {
+        log.Info("🛑 执行停止前清理...")
+        // 完成正在处理的请求
+        // 保存状态数据
+        return nil
+    }).
+    // 停止后回调
+    AfterStop(func(ctx context.Context) error {
+        log.Info("✅ 服务已完全停止")
+        // 清理资源
+        // 发送停止通知
+        return nil
+    }).
+    HTTP(setupRoutes).
+    Run()
+```
+
+### 📊 健康检查和监控
+
+框架自动提供健康检查和监控端点：
+
+```bash
+# 健康检查
+curl http://localhost:8080/health
+
+# 响应示例
+{
+  "status": "ok",
+  "service": "my-service",
+  "version": "v1.0.0",
+  "timestamp": "2024-01-20T10:00:00Z",
+  "components": {
+    "database": "healthy",
+    "redis": "healthy",
+    "grpc": "healthy"
+  }
+}
+
+# Prometheus监控指标
+curl http://localhost:9092/metrics
+```
+
+### 🔍 最佳实践
+
+#### 1. 项目结构建议
+
+```
+my-service/
+├── main.go                 # 主程序入口
+├── config/
+│   ├── config.yaml         # 配置文件
+│   ├── development.yaml    # 开发环境配置
+│   └── production.yaml     # 生产环境配置
+├── internal/
+│   ├── handler/            # HTTP处理器
+│   ├── service/            # 业务逻辑
+│   ├── repository/         # 数据访问层
+│   └── model/              # 数据模型
+├── proto/                  # gRPC协议文件
+├── scripts/                # 部署脚本
+└── docs/                   # 文档
+```
+
+#### 2. 错误处理
+
+```go
+import (
+    "errors"
+    "github.com/qiaojinxia/distributed-service/framework/logger"
+)
+
+func businessLogic() error {
+    log := logger.GetLogger()
+    
+    if err := doSomething(); err != nil {
+        // 记录详细错误信息
+        log.Error("业务处理失败", 
+            logger.Any("error", err),
+            logger.String("operation", "user_create"),
+            logger.String("user_id", "12345"))
+        
+        // 返回用户友好的错误
+        return errors.New("用户创建失败，请稍后重试")
+    }
+    
+    log.Info("业务处理成功")
+    return nil
+}
+```
+
+#### 3. 性能优化
+
+```go
+// 启用所有性能相关组件
+framework.New().
+    Port(8080).
+    Mode("release").               // 生产模式
+    EnableAll().                   // 启用所有组件
+    WithMetrics(&metrics.Config{   // 自定义监控配置
+        Enabled: true,
+        Port:    9092,
+    }).
+    WithTracing(&tracing.Config{   // 自定义追踪配置
+        SampleRatio: 0.1,          // 10%采样率
+    }).
+    HTTP(setupRoutes).
+    Run()
+```
+
+这个框架基础使用指南涵盖了从最简单的启动到复杂的双服务配置，帮助开发者快速上手并构建生产级的分布式服务。
+
 ## 🧩 插件系统
 
 ### 插件类型

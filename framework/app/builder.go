@@ -3,12 +3,55 @@ package app
 import (
 	"context"
 	"fmt"
-	"github.com/qiaojinxia/distributed-service/framework/component"
-	"github.com/qiaojinxia/distributed-service/framework/config"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/qiaojinxia/distributed-service/framework/component"
+	"github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/framework/logger"
+	"github.com/qiaojinxia/distributed-service/framework/transport/http"
 )
+
+// ================================
+// 🚀 传输层包装器
+// ================================
+
+// HTTPTransport HTTP传输层包装器
+type HTTPTransport struct {
+	port     int
+	mode     string
+	handlers []HTTPHandler
+	server   *http.Server
+}
+
+// Start 启动HTTP传输层
+func (h *HTTPTransport) Start(ctx context.Context) error {
+	// 创建HTTP服务器配置
+	cfg := &http.Config{
+		Port: h.port,
+		Mode: h.mode,
+	}
+
+	// 创建HTTP服务器
+	h.server = http.NewServer(cfg)
+
+	// 注册所有路由处理器
+	for _, handler := range h.handlers {
+		handler(h.server.Engine())
+	}
+
+	// 启动服务器
+	return h.server.Start(ctx)
+}
+
+// Stop 停止HTTP传输层
+func (h *HTTPTransport) Stop(ctx context.Context) error {
+	if h.server != nil {
+		return h.server.Stop(ctx)
+	}
+	return nil
+}
 
 // Builder 应用构建器 - 提供流畅的链式配置API
 type Builder struct {
@@ -245,12 +288,24 @@ func (b *Builder) DisableTracing() *Builder {
 
 // OnlyHTTP 只启用HTTP服务
 func (b *Builder) OnlyHTTP() *Builder {
-	return b.EnableHTTP().DisableGRPC()
+	// 禁用应用级别的gRPC
+	b.EnableHTTP().DisableGRPC()
+
+	// 同时禁用组件管理器中的gRPC
+	b.componentManager = component.NewManager(component.DisableComponent("grpc"))
+
+	return b
 }
 
 // OnlyGRPC 只启用gRPC服务
 func (b *Builder) OnlyGRPC() *Builder {
-	return b.EnableGRPC().DisableHTTP()
+	// 禁用应用级别的HTTP
+	b.EnableGRPC().DisableHTTP()
+
+	// 确保组件管理器中gRPC是启用的（保持默认）
+	// 这里不需要特殊处理，因为默认配置就是启用gRPC的
+
+	return b
 }
 
 // EnableAll 启用所有组件
@@ -506,12 +561,18 @@ func (b *Builder) setupDefaults() {
 
 // build 构建应用
 func (b *Builder) build() error {
-	fmt.Printf("🔧 Building app: %s (%s)\n", b.app.opts.Name, b.app.opts.Version)
-	fmt.Printf("📡 HTTP: %v, gRPC: %v, Metrics: %v, Tracing: %v\n",
-		b.app.opts.EnableHTTP, b.app.opts.EnableGRPC,
-		b.app.opts.EnableMetrics, b.app.opts.EnableTracing)
+	log := logger.GetLogger()
+	log.Info("🔧 Building app",
+		logger.String("name", b.app.opts.Name),
+		logger.String("version", b.app.opts.Version))
+	log.Info("📡 Service configuration",
+		logger.Bool("HTTP", b.app.opts.EnableHTTP),
+		logger.Bool("gRPC", b.app.opts.EnableGRPC),
+		logger.Bool("Metrics", b.app.opts.EnableMetrics),
+		logger.Bool("Tracing", b.app.opts.EnableTracing))
 
 	// 初始化组件管理器
+	log.Info("🔧 Initializing components...")
 	if err := b.componentManager.Init(b.app.ctx); err != nil {
 		return fmt.Errorf("failed to init components: %w", err)
 	}
@@ -519,13 +580,51 @@ func (b *Builder) build() error {
 	// 将组件管理器添加到应用
 	b.app.AddComponent(&ComponentWrapper{manager: b.componentManager})
 
+	// 初始化HTTP传输层
+	if b.app.opts.EnableHTTP {
+		if err := b.setupHTTPTransport(); err != nil {
+			return fmt.Errorf("failed to setup HTTP transport: %w", err)
+		}
+	}
+
+	// 初始化gRPC传输层
+	if b.app.opts.EnableGRPC {
+		if err := b.setupGRPCTransport(); err != nil {
+			return fmt.Errorf("failed to setup gRPC transport: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// setupHTTPTransport 设置HTTP传输层
+func (b *Builder) setupHTTPTransport() error {
+	log := logger.GetLogger()
+	// 导入HTTP包
+	httpTransport := &HTTPTransport{
+		port:     b.app.opts.Port,
+		mode:     b.app.opts.Mode,
+		handlers: b.httpHandlers,
+	}
+
+	b.app.AddTransport(httpTransport)
+	log.Info("✅ HTTP transport configured")
+	return nil
+}
+
+// setupGRPCTransport 设置gRPC传输层
+func (b *Builder) setupGRPCTransport() error {
+	log := logger.GetLogger()
+	// gRPC已经在组件管理器中处理
+	log.Info("✅ gRPC transport configured (via component manager)")
 	return nil
 }
 
 // defaultHTTPHandler 默认HTTP处理器
 func defaultHTTPHandler(r interface{}) {
+	log := logger.GetLogger()
 	// 这里会在 transport/http 中实现具体的路由
-	fmt.Println("📡 Setting up default HTTP routes...")
+	log.Info("📡 Setting up default HTTP routes...")
 }
 
 // ================================

@@ -3,14 +3,15 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"net"
+	"time"
+
 	"github.com/qiaojinxia/distributed-service/framework/logger"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
-	"net"
-	"time"
 )
 
 // Config holds gRPC server configuration
@@ -125,7 +126,15 @@ func (s *Server) Start(ctx context.Context) error {
 		s.healthSrv.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 	}
 
-	return s.server.Serve(s.listener)
+	// 在goroutine中启动服务器，使其非阻塞
+	go func() {
+		if err := s.server.Serve(s.listener); err != nil {
+			logger.Error(ctx, "gRPC server stopped with error", logger.Any("error", err))
+		}
+	}()
+
+	logger.Info(ctx, "gRPC server started successfully")
+	return nil
 }
 
 // Stop gracefully stops the gRPC server

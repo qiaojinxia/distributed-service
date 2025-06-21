@@ -7,6 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/qiaojinxia/distributed-service/framework/logger"
 )
 
 // App 应用实例 - 框架的核心运行时
@@ -169,8 +171,12 @@ func (a *App) Run() error {
 		}
 	}
 
-	fmt.Printf("🚀 %s (%s) started on port %d in %s mode\n",
-		a.opts.Name, a.opts.Version, a.opts.Port, a.opts.Mode)
+	log := logger.GetLogger()
+	log.Info("🚀 Application started",
+		logger.String("name", a.opts.Name),
+		logger.String("version", a.opts.Version),
+		logger.Int("port", a.opts.Port),
+		logger.String("mode", a.opts.Mode))
 
 	// 6. 等待停止信号
 	return a.waitForShutdown()
@@ -178,7 +184,8 @@ func (a *App) Run() error {
 
 // Stop 停止应用
 func (a *App) Stop() error {
-	fmt.Println("🛑 Shutting down server...")
+	log := logger.GetLogger()
+	log.Info("🛑 Shutting down server...")
 
 	// 创建超时上下文
 	ctx, cancel := context.WithTimeout(context.Background(), a.opts.ShutdownTimeout)
@@ -187,33 +194,35 @@ func (a *App) Stop() error {
 	// 执行停止前回调
 	for _, fn := range a.beforeStop {
 		if err := fn(ctx); err != nil {
-			fmt.Printf("Before stop callback failed: %v\n", err)
+			log.Error("Before stop callback failed", logger.Any("error", err))
 		}
 	}
 
 	// 停止传输层
 	for _, transport := range a.transports {
 		if err := transport.Stop(ctx); err != nil {
-			fmt.Printf("Transport stop failed: %v\n", err)
+			log.Error("Transport stop failed", logger.Any("error", err))
 		}
 	}
 
 	// 停止组件
 	for i := len(a.components) - 1; i >= 0; i-- {
 		if err := a.components[i].Stop(ctx); err != nil {
-			fmt.Printf("Component %s stop failed: %v\n", a.components[i].Name(), err)
+			log.Error("Component stop failed",
+				logger.String("component", a.components[i].Name()),
+				logger.Any("error", err))
 		}
 	}
 
 	// 执行停止后回调
 	for _, fn := range a.afterStop {
 		if err := fn(ctx); err != nil {
-			fmt.Printf("After stop callback failed: %v\n", err)
+			log.Error("After stop callback failed", logger.Any("error", err))
 		}
 	}
 
 	a.cancel()
-	fmt.Println("✅ Server stopped gracefully")
+	log.Info("✅ Server stopped gracefully")
 	return nil
 }
 

@@ -147,7 +147,7 @@ type Logger interface {
 
 	Debugf(template string, args ...interface{})
 	Infof(template string, args ...interface{})
-	Warnf(template string, args ...interface{})
+
 	Errorf(template string, args ...interface{})
 	Fatalf(template string, args ...interface{})
 
@@ -195,9 +195,6 @@ func (l *zapLogger) Infof(template string, args ...interface{}) {
 }
 
 // Warnf 格式化warn日志
-func (l *zapLogger) Warnf(template string, args ...interface{}) {
-	l.logger.Sugar().Warnf(template, args...)
-}
 
 // Errorf 格式化error日志
 func (l *zapLogger) Errorf(template string, args ...interface{}) {
@@ -218,7 +215,7 @@ func (l *zapLogger) With(fields ...zapcore.Field) Logger {
 func GetLogger() Logger {
 	if globalLogger == nil {
 		// 如果没有初始化，使用默认配置
-		InitLogger(&Config{
+		_ = InitLogger(&Config{
 			Level:      "info",
 			Encoding:   "console",
 			OutputPath: "stdout",

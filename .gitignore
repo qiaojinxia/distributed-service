@@ -27,3 +27,4 @@ go.work.sum
 *.tmp
 *.temp
 *~
+/examples/http_grpc_test/http-grpc-test
