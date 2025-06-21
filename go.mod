@@ -1,8 +1,6 @@
 module github.com/qiaojinxia/distributed-service
 
-go 1.23.8
-
-toolchain go1.24.3
+go 1.24.4
 
 require (
 	github.com/Shopify/sarama v1.19.0

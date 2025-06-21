@@ -92,28 +92,28 @@ protection:
       stat_interval_ms: 1000               # 统计窗口1秒
       enabled: true
       description: "健康检查接口限流 - 每秒2次 (2 QPS)"
-    
+
     - name: "auth_api_limiter"
       resource: "/api/v1/auth/*"            # 所有认证相关接口
       threshold: 10                         # 60秒内最多10个请求
       stat_interval_ms: 60000              # 统计窗口60秒
       enabled: true
       description: "认证接口限流 - 每分钟10次 (0.167 QPS)"
-    
+
     - name: "users_api_limiter"
       resource: "/api/v1/users/*"           # 所有用户相关接口
       threshold: 30                         # 60秒内最多30个请求
       stat_interval_ms: 60000              # 统计窗口60秒
       enabled: true
       description: "用户接口限流 - 每分钟30次 (0.5 QPS)"
-    
+
     - name: "api_general_limiter"
       resource: "/api/*"                    # 所有API接口兜底限流
       threshold: 100                        # 60秒内最多100个请求
       stat_interval_ms: 60000              # 统计窗口60秒
       enabled: true
       description: "API接口通用限流 - 每分钟100次 (1.67 QPS)"
-    
+
     - name: "protection_status_limiter"
       resource: "/protection/*"             # 保护状态相关接口
       threshold: 20                         # 1秒内最多20个请求
@@ -128,14 +128,14 @@ protection:
       stat_interval_ms: 1000               # 统计窗口1秒
       enabled: true
       description: "gRPC用户服务限流 - 每秒50次 (50 QPS)"
-    
+
     - name: "grpc_read_operations_limiter"
       resource: "/grpc/*/get*,/grpc/*/list*,/grpc/*/find*"  # 所有gRPC读操作
       threshold: 80                         # 1秒内最多80个请求
       stat_interval_ms: 1000               # 统计窗口1秒
       enabled: true
       description: "gRPC读操作限流 - 每秒80次 (80 QPS)"
-    
+
     - name: "grpc_write_operations_limiter"
       resource: "/grpc/*/create*,/grpc/*/update*,/grpc/*/delete*"  # 所有gRPC写操作
       threshold: 10                         # 60秒内最多10个请求
@@ -157,7 +157,7 @@ protection:
       probe_num: 3                          # 半开状态需要3个探测请求
       enabled: true
       description: "认证接口熔断器 - 错误率超过50%时熔断"
-    
+
     - name: "users_api_circuit"
       resource: "/api/v1/users/*"           # 所有用户相关接口
       strategy: "ErrorRatio"                # 错误比例策略
@@ -169,7 +169,7 @@ protection:
       probe_num: 2                          # 半开状态需要2个探测请求
       enabled: true
       description: "用户接口熔断器 - 错误率超过60%时熔断"
-    
+
     - name: "api_general_circuit"
       resource: "/api/*"                    # 所有API接口兜底熔断
       strategy: "ErrorRatio"                # 错误比例策略
@@ -195,7 +195,7 @@ protection:
       probe_num: 5                          # 半开状态需要5个探测请求
       enabled: true
       description: "gRPC用户服务熔断器 - 慢调用比例超过30%时熔断"
-    
+
     - name: "grpc_write_operations_circuit"
       resource: "/grpc/*/create*,/grpc/*/update*,/grpc/*/delete*"  # 所有gRPC写操作
       strategy: "ErrorRatio"                # 错误比例策略
