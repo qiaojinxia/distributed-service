@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"distributed-service/pkg/config"
-	"distributed-service/pkg/logger"
-	"distributed-service/pkg/middleware"
+	"distributed-service/framework/config"
+	"distributed-service/framework/logger"
+	"distributed-service/framework/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"

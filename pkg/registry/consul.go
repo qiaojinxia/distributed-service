@@ -2,8 +2,8 @@ package registry
 
 import (
 	"context"
-	"distributed-service/pkg/config"
-	"distributed-service/pkg/logger"
+	"distributed-service/framework/config"
+	"distributed-service/framework/logger"
 	"fmt"
 	"os"
 	"strings"

@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"distributed-service/pkg/config"
-	"distributed-service/pkg/logger"
-	"distributed-service/pkg/middleware"
+	"distributed-service/framework/config"
+	"distributed-service/framework/logger"
+	"distributed-service/framework/middleware"
 	orderPb "distributed-service/test/distributed-service/test/proto/order"
 	userPb "distributed-service/test/distributed-service/test/proto/user"
 

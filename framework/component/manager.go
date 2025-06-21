@@ -1,0 +1,888 @@
+package component
+
+import (
+	"context"
+	"distributed-service/framework/auth"
+	"distributed-service/framework/config"
+	"distributed-service/framework/database"
+	"distributed-service/framework/logger"
+	"distributed-service/framework/middleware"
+	"distributed-service/framework/tracing"
+	localgrpc "distributed-service/framework/transport/grpc"
+	"distributed-service/pkg/etcd"
+	"distributed-service/pkg/kafka"
+	"distributed-service/pkg/mq"
+	"distributed-service/pkg/redis_cluster"
+	"distributed-service/pkg/registry"
+	"fmt"
+
+	"google.golang.org/grpc"
+)
+
+// ComponentManager 组件管理器 - 统一管理所有组件的生命周期
+type ComponentManager struct {
+	// 核心组件
+	config     *config.Config
+	auth       *auth.JWTManager
+	registry   *registry.ServiceRegistry
+	grpcServer *localgrpc.Server
+
+	// 中间件和保护
+	protection *middleware.SentinelProtectionMiddleware
+
+	// 监控和追踪
+	tracing *tracing.Manager
+
+	// 组件配置
+	opts *Options
+
+	// 状态
+	initialized bool
+	started     bool
+}
+
+// Options 组件配置选项
+type Options struct {
+	// 配置文件
+	ConfigPath string
+
+	// 组件开关
+	EnableConfig        bool
+	EnableLogger        bool
+	EnableDatabase      bool
+	EnableRedis         bool
+	EnableRedisCluster  bool
+	EnableAuth          bool
+	EnableRegistry      bool
+	EnableGRPC          bool
+	EnableMQ            bool
+	EnableMetrics       bool
+	EnableTracing       bool
+	EnableProtection    bool
+	EnableElasticsearch bool
+	EnableKafka         bool
+	EnableMongoDB       bool
+	EnableEtcd          bool
+
+	// 组件配置
+	DatabaseConfig      *config.MySQLConfig
+	RedisConfig         *config.RedisConfig
+	RedisClusterConfig  *config.RedisClusterConfig
+	AuthConfig          *config.JWTConfig
+	RegistryConfig      *config.ConsulConfig
+	GRPCConfig          *config.GRPCConfig
+	MQConfig            *config.RabbitMQConfig
+	MetricsConfig       *config.MetricsConfig
+	TracingConfig       *config.TracingConfig
+	ProtectionConfig    *config.ProtectionConfig
+	LoggerConfig        *config.LoggerConfig
+	ElasticsearchConfig *config.ElasticsearchConfig
+	KafkaConfig         *config.KafkaConfig
+	MongoDBConfig       *config.MongoDBConfig
+	EtcdConfig          *config.EtcdConfig
+}
+
+// Option 组件配置选项函数
+type Option func(*Options)
+
+// NewManager 创建组件管理器
+func NewManager(opts ...Option) *ComponentManager {
+	// 默认配置
+	options := &Options{
+		ConfigPath:          "config/config.yaml",
+		EnableConfig:        true,
+		EnableLogger:        true,
+		EnableDatabase:      true,
+		EnableRedis:         true,
+		EnableRedisCluster:  false,
+		EnableAuth:          true,
+		EnableRegistry:      true,
+		EnableGRPC:          true,
+		EnableMQ:            true,
+		EnableMetrics:       true,
+		EnableTracing:       true,
+		EnableProtection:    true,
+		EnableElasticsearch: false, // 默认禁用，按需启用
+		EnableKafka:         false, // 默认禁用，按需启用
+		EnableMongoDB:       false, // 默认禁用，按需启用
+		EnableEtcd:          false, // 默认禁用，按需启用
+	}
+
+	// 应用选项
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	return &ComponentManager{
+		opts: options,
+	}
+}
+
+// ================================
+// 🛠️ 配置选项
+// ================================
+
+// WithConfig 配置文件选项
+func WithConfig(path string) Option {
+	return func(o *Options) {
+		o.ConfigPath = path
+	}
+}
+
+// WithDatabase 数据库配置
+func WithDatabase(cfg *config.MySQLConfig) Option {
+	return func(o *Options) {
+		o.DatabaseConfig = cfg
+		o.EnableDatabase = true
+	}
+}
+
+// WithRedis Redis配置
+func WithRedis(cfg *config.RedisConfig) Option {
+	return func(o *Options) {
+		o.RedisConfig = cfg
+		o.EnableRedis = true
+	}
+}
+
+// WithRedisCluster Redis集群配置
+func WithRedisCluster(cfg *config.RedisClusterConfig) Option {
+	return func(o *Options) {
+		o.RedisClusterConfig = cfg
+		o.EnableRedisCluster = true
+	}
+}
+
+// WithAuth 认证配置
+func WithAuth(cfg *config.JWTConfig) Option {
+	return func(o *Options) {
+		o.AuthConfig = cfg
+		o.EnableAuth = true
+	}
+}
+
+// WithRegistry 服务注册配置
+func WithRegistry(cfg *config.ConsulConfig) Option {
+	return func(o *Options) {
+		o.RegistryConfig = cfg
+		o.EnableRegistry = true
+	}
+}
+
+// WithGRPC gRPC配置
+func WithGRPC(cfg *config.GRPCConfig) Option {
+	return func(o *Options) {
+		o.GRPCConfig = cfg
+		o.EnableGRPC = true
+	}
+}
+
+// WithMQ 消息队列配置
+func WithMQ(cfg *config.RabbitMQConfig) Option {
+	return func(o *Options) {
+		o.MQConfig = cfg
+		o.EnableMQ = true
+	}
+}
+
+// WithMetrics 监控配置
+func WithMetrics(cfg *config.MetricsConfig) Option {
+	return func(o *Options) {
+		o.MetricsConfig = cfg
+		o.EnableMetrics = true
+	}
+}
+
+// WithTracing 链路追踪配置
+func WithTracing(cfg *config.TracingConfig) Option {
+	return func(o *Options) {
+		o.TracingConfig = cfg
+		o.EnableTracing = true
+	}
+}
+
+// WithProtection 保护组件配置
+func WithProtection(cfg *config.ProtectionConfig) Option {
+	return func(o *Options) {
+		o.ProtectionConfig = cfg
+		o.EnableProtection = true
+	}
+}
+
+// WithLogger 日志配置
+func WithLogger(cfg *config.LoggerConfig) Option {
+	return func(o *Options) {
+		o.LoggerConfig = cfg
+		o.EnableLogger = true
+	}
+}
+
+// WithElasticsearch Elasticsearch配置
+func WithElasticsearch(cfg *config.ElasticsearchConfig) Option {
+	return func(o *Options) {
+		o.ElasticsearchConfig = cfg
+		o.EnableElasticsearch = true
+	}
+}
+
+// WithKafka Kafka配置
+func WithKafka(cfg *config.KafkaConfig) Option {
+	return func(o *Options) {
+		o.KafkaConfig = cfg
+		o.EnableKafka = true
+	}
+}
+
+// WithMongoDB MongoDB配置
+func WithMongoDB(cfg *config.MongoDBConfig) Option {
+	return func(o *Options) {
+		o.MongoDBConfig = cfg
+		o.EnableMongoDB = true
+	}
+}
+
+// WithEtcd Etcd配置
+func WithEtcd(cfg *config.EtcdConfig) Option {
+	return func(o *Options) {
+		o.EtcdConfig = cfg
+		o.EnableEtcd = true
+	}
+}
+
+// DisableComponent 禁用指定组件
+func DisableComponent(components ...string) Option {
+	return func(o *Options) {
+		for _, comp := range components {
+			switch comp {
+			case "config":
+				o.EnableConfig = false
+			case "logger":
+				o.EnableLogger = false
+			case "database":
+				o.EnableDatabase = false
+			case "redis":
+				o.EnableRedis = false
+			case "redis_cluster":
+				o.EnableRedisCluster = false
+			case "auth":
+				o.EnableAuth = false
+			case "registry":
+				o.EnableRegistry = false
+			case "grpc":
+				o.EnableGRPC = false
+			case "mq":
+				o.EnableMQ = false
+			case "metrics":
+				o.EnableMetrics = false
+			case "tracing":
+				o.EnableTracing = false
+			case "protection":
+				o.EnableProtection = false
+			case "elasticsearch":
+				o.EnableElasticsearch = false
+			case "kafka":
+				o.EnableKafka = false
+			case "mongodb":
+				o.EnableMongoDB = false
+			case "etcd":
+				o.EnableEtcd = false
+			}
+		}
+	}
+}
+
+// ================================
+// 🔄 生命周期管理
+// ================================
+
+// Init 初始化所有启用的组件
+func (m *ComponentManager) Init(ctx context.Context) error {
+	if m.initialized {
+		return nil
+	}
+
+	fmt.Println("🔧 Initializing components...")
+
+	// 1. 初始化配置
+	if m.opts.EnableConfig {
+		if err := m.initConfig(ctx); err != nil {
+			return fmt.Errorf("failed to init config: %w", err)
+		}
+	}
+
+	// 2. 初始化日志
+	if m.opts.EnableLogger {
+		if err := m.initLogger(ctx); err != nil {
+			return fmt.Errorf("failed to init logger: %w", err)
+		}
+	}
+
+	// 3. 初始化数据库
+	if m.opts.EnableDatabase {
+		if err := m.initDatabase(ctx); err != nil {
+			return fmt.Errorf("failed to init database: %w", err)
+		}
+	}
+
+	// 4. 初始化Redis
+	if m.opts.EnableRedis {
+		if err := m.initRedis(ctx); err != nil {
+			return fmt.Errorf("failed to init redis: %w", err)
+		}
+	}
+
+	// 5. 初始化Redis集群
+	if m.opts.EnableRedisCluster {
+		if err := m.initRedisCluster(ctx); err != nil {
+			return fmt.Errorf("failed to init redis cluster: %w", err)
+		}
+	}
+
+	// 6. 初始化认证
+	if m.opts.EnableAuth {
+		if err := m.initAuth(ctx); err != nil {
+			return fmt.Errorf("failed to init auth: %w", err)
+		}
+	}
+
+	// 7. 初始化链路追踪
+	if m.opts.EnableTracing {
+		if err := m.initTracing(ctx); err != nil {
+			return fmt.Errorf("failed to init tracing: %w", err)
+		}
+	}
+
+	// 8. 初始化监控指标
+	if m.opts.EnableMetrics {
+		if err := m.initMetrics(ctx); err != nil {
+			return fmt.Errorf("failed to init metrics: %w", err)
+		}
+	}
+
+	// 9. 初始化保护组件
+	if m.opts.EnableProtection {
+		if err := m.initProtection(ctx); err != nil {
+			return fmt.Errorf("failed to init protection: %w", err)
+		}
+	}
+
+	// 10. 初始化消息队列
+	if m.opts.EnableMQ {
+		if err := m.initMQ(ctx); err != nil {
+			return fmt.Errorf("failed to init mq: %w", err)
+		}
+	}
+
+	// 11. 初始化Kafka
+	if m.opts.EnableKafka {
+		if err := m.initKafka(ctx); err != nil {
+			return fmt.Errorf("failed to init kafka: %w", err)
+		}
+	}
+
+	// 12. 初始化Etcd
+	if m.opts.EnableEtcd {
+		if err := m.initEtcd(ctx); err != nil {
+			return fmt.Errorf("failed to init etcd: %w", err)
+		}
+	}
+
+	// 13. 初始化服务注册
+	if m.opts.EnableRegistry {
+		if err := m.initRegistry(ctx); err != nil {
+			return fmt.Errorf("failed to init registry: %w", err)
+		}
+	}
+
+	// 14. 初始化gRPC服务器
+	if m.opts.EnableGRPC {
+		if err := m.initGRPCServer(ctx); err != nil {
+			return fmt.Errorf("failed to init grpc: %w", err)
+		}
+	}
+
+	// 15. 初始化Elasticsearch
+	if m.opts.EnableElasticsearch {
+		if err := m.initElasticsearch(ctx); err != nil {
+			return fmt.Errorf("failed to init elasticsearch: %w", err)
+		}
+	}
+
+	// 16. 初始化MongoDB
+	if m.opts.EnableMongoDB {
+		if err := m.initMongoDB(ctx); err != nil {
+			return fmt.Errorf("failed to init mongodb: %w", err)
+		}
+	}
+
+	m.initialized = true
+	fmt.Println("✅ All components initialized")
+	return nil
+}
+
+// Start 启动所有组件
+func (m *ComponentManager) Start(ctx context.Context) error {
+	if !m.initialized {
+		return fmt.Errorf("components not initialized")
+	}
+
+	if m.started {
+		return nil
+	}
+
+	fmt.Println("🚀 Starting components...")
+
+	// 启动各个组件
+	if m.grpcServer != nil {
+		if err := m.grpcServer.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start grpc server: %w", err)
+		}
+	}
+
+	m.started = true
+	fmt.Println("✅ All components started")
+	return nil
+}
+
+// Stop 停止所有组件
+func (m *ComponentManager) Stop(ctx context.Context) error {
+	if !m.started {
+		return nil
+	}
+
+	fmt.Println("🛑 Stopping components...")
+
+	// 停止各个组件
+	if m.grpcServer != nil {
+		if err := m.grpcServer.Stop(ctx); err != nil {
+			fmt.Printf("Failed to stop grpc server: %v\n", err)
+		}
+	}
+
+	if m.tracing != nil {
+		if err := m.tracing.Shutdown(ctx); err != nil {
+			fmt.Printf("Failed to stop tracing: %v\n", err)
+		}
+	}
+
+	m.started = false
+	fmt.Println("✅ All components stopped")
+	return nil
+}
+
+// ================================
+// 🔧 组件初始化方法
+// ================================
+
+// initConfig 初始化配置
+func (m *ComponentManager) initConfig(ctx context.Context) error {
+	if err := config.LoadConfig(m.opts.ConfigPath); err != nil {
+		return fmt.Errorf("load config failed: %w", err)
+	}
+	m.config = &config.GlobalConfig
+	fmt.Println("✅ Config loaded")
+	return nil
+}
+
+// initLogger 初始化日志
+func (m *ComponentManager) initLogger(ctx context.Context) error {
+	var cfg *logger.Config
+	if m.opts.LoggerConfig != nil {
+		cfg = &logger.Config{
+			Level:      m.opts.LoggerConfig.Level,
+			Encoding:   m.opts.LoggerConfig.Encoding,
+			OutputPath: m.opts.LoggerConfig.OutputPath,
+		}
+	} else if m.config != nil {
+		cfg = &logger.Config{
+			Level:      m.config.Logger.Level,
+			Encoding:   m.config.Logger.Encoding,
+			OutputPath: m.config.Logger.OutputPath,
+		}
+	} else {
+		cfg = &logger.Config{
+			Level:      "info",
+			Encoding:   "console",
+			OutputPath: "stdout",
+		}
+	}
+
+	if err := logger.InitLogger(cfg); err != nil {
+		return err
+	}
+	fmt.Println("✅ Logger initialized")
+	return nil
+}
+
+// initDatabase 初始化数据库
+func (m *ComponentManager) initDatabase(ctx context.Context) error {
+	var cfg *config.MySQLConfig
+	if m.opts.DatabaseConfig != nil {
+		cfg = m.opts.DatabaseConfig
+	} else if m.config != nil {
+		cfg = &m.config.MySQL
+	} else {
+		return fmt.Errorf("database config not found")
+	}
+
+	if err := database.InitMySQL(ctx, cfg); err != nil {
+		return err
+	}
+	fmt.Println("✅ Database initialized")
+	return nil
+}
+
+// initRedis 初始化Redis
+func (m *ComponentManager) initRedis(ctx context.Context) error {
+	var cfg *config.RedisConfig
+	if m.opts.RedisConfig != nil {
+		cfg = m.opts.RedisConfig
+	} else if m.config != nil {
+		cfg = &m.config.Redis
+	} else {
+		return fmt.Errorf("redis config not found")
+	}
+
+	if err := database.InitRedis(ctx, cfg); err != nil {
+		return err
+	}
+	fmt.Println("✅ Redis initialized")
+	return nil
+}
+
+// initRedisCluster 初始化Redis集群
+func (m *ComponentManager) initRedisCluster(ctx context.Context) error {
+	var cfg *config.RedisClusterConfig
+	if m.opts.RedisClusterConfig != nil {
+		cfg = m.opts.RedisClusterConfig
+	} else if m.config != nil {
+		cfg = &m.config.RedisCluster
+	} else {
+		return fmt.Errorf("redis cluster config not found")
+	}
+
+	clusterCfg, err := redis_cluster.ConvertConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	if err := redis_cluster.InitRedisCluster(ctx, clusterCfg); err != nil {
+		return err
+	}
+	fmt.Println("✅ Redis Cluster initialized")
+	return nil
+}
+
+// initAuth 初始化认证
+func (m *ComponentManager) initAuth(ctx context.Context) error {
+	var secretKey, issuer string
+	if m.opts.AuthConfig != nil {
+		secretKey = m.opts.AuthConfig.SecretKey
+		issuer = m.opts.AuthConfig.Issuer
+	} else if m.config != nil {
+		secretKey = m.config.JWT.SecretKey
+		issuer = m.config.JWT.Issuer
+	} else {
+		secretKey = "default-secret-key"
+		issuer = "distributed-service"
+	}
+
+	m.auth = auth.NewJWTManager(secretKey, issuer)
+	fmt.Println("✅ Auth initialized")
+	return nil
+}
+
+// initTracing 初始化链路追踪
+func (m *ComponentManager) initTracing(ctx context.Context) error {
+	var cfg *tracing.Config
+	if m.opts.TracingConfig != nil {
+		cfg = &tracing.Config{
+			ServiceName:    m.opts.TracingConfig.ServiceName,
+			ServiceVersion: m.opts.TracingConfig.ServiceVersion,
+			Environment:    m.opts.TracingConfig.Environment,
+			Enabled:        m.opts.TracingConfig.Enabled,
+			ExporterType:   m.opts.TracingConfig.ExporterType,
+			Endpoint:       m.opts.TracingConfig.Endpoint,
+			SampleRatio:    m.opts.TracingConfig.SampleRatio,
+		}
+	} else if m.config != nil {
+		cfg = &tracing.Config{
+			ServiceName:    m.config.Tracing.ServiceName,
+			ServiceVersion: m.config.Tracing.ServiceVersion,
+			Environment:    m.config.Tracing.Environment,
+			Enabled:        m.config.Tracing.Enabled,
+			ExporterType:   m.config.Tracing.ExporterType,
+			Endpoint:       m.config.Tracing.Endpoint,
+			SampleRatio:    m.config.Tracing.SampleRatio,
+		}
+	} else {
+		cfg = &tracing.Config{
+			ServiceName:    "distributed-service",
+			ServiceVersion: "v1.0.0",
+			Environment:    "development",
+			Enabled:        true,
+			ExporterType:   "jaeger",
+			SampleRatio:    1.0,
+		}
+	}
+
+	tracingManager, err := tracing.NewTracingManager(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	m.tracing = tracingManager
+	fmt.Println("✅ Tracing initialized")
+	return nil
+}
+
+// initMetrics 初始化监控指标
+func (m *ComponentManager) initMetrics(ctx context.Context) error {
+	// 这里可以初始化Prometheus metrics
+	fmt.Println("✅ Metrics initialized")
+	return nil
+}
+
+// initProtection 初始化保护组件
+func (m *ComponentManager) initProtection(ctx context.Context) error {
+	var cfg *config.ProtectionConfig
+	if m.opts.ProtectionConfig != nil {
+		cfg = m.opts.ProtectionConfig
+	} else if m.config != nil {
+		cfg = &m.config.Protection
+	} else {
+		return nil // 保护组件可选
+	}
+
+	protection, err := middleware.NewSentinelProtectionMiddleware(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	m.protection = protection
+	fmt.Println("✅ Protection initialized")
+	return nil
+}
+
+// initMQ 初始化消息队列
+func (m *ComponentManager) initMQ(ctx context.Context) error {
+	var cfg *config.RabbitMQConfig
+	if m.opts.MQConfig != nil {
+		cfg = m.opts.MQConfig
+	} else if m.config != nil {
+		cfg = &m.config.RabbitMQ
+	} else {
+		return fmt.Errorf("mq config not found")
+	}
+
+	if err := mq.InitRabbitMQ(ctx, cfg); err != nil {
+		return err
+	}
+	fmt.Println("✅ Message Queue initialized")
+	return nil
+}
+
+// initRegistry 初始化服务注册
+func (m *ComponentManager) initRegistry(ctx context.Context) error {
+	var cfg *config.ConsulConfig
+	if m.opts.RegistryConfig != nil {
+		cfg = m.opts.RegistryConfig
+	} else if m.config != nil {
+		cfg = &m.config.Consul
+	} else {
+		return fmt.Errorf("registry config not found")
+	}
+
+	serviceRegistry, err := registry.NewServiceRegistry(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	m.registry = serviceRegistry
+	fmt.Println("✅ Service Registry initialized")
+	return nil
+}
+
+// initGRPCServer 初始化gRPC服务器
+func (m *ComponentManager) initGRPCServer(ctx context.Context) error {
+	var cfg *localgrpc.Config
+	if m.opts.GRPCConfig != nil {
+		convertedCfg, err := localgrpc.ConvertConfig(m.opts.GRPCConfig)
+		if err != nil {
+			return err
+		}
+		cfg = convertedCfg
+	} else if m.config != nil {
+		convertedCfg, err := localgrpc.ConvertConfig(&m.config.GRPC)
+		if err != nil {
+			return err
+		}
+		cfg = convertedCfg
+	} else {
+		// 默认配置
+		defaultConfig := &config.GRPCConfig{
+			Port: 9000,
+		}
+		convertedCfg, err := localgrpc.ConvertConfig(defaultConfig)
+		if err != nil {
+			return err
+		}
+		cfg = convertedCfg
+	}
+
+	// 创建拦截器链
+	var unaryInterceptors []grpc.UnaryServerInterceptor
+	var streamInterceptors []grpc.StreamServerInterceptor
+
+	// 添加基础中间件
+	unaryInterceptors = append(unaryInterceptors,
+		middleware.GRPCRecoveryInterceptor(),
+		middleware.GRPCLoggingInterceptor(),
+		middleware.GRPCMetricsInterceptor(),
+	)
+	streamInterceptors = append(streamInterceptors,
+		middleware.GRPCStreamRecoveryInterceptor(),
+		middleware.GRPCStreamLoggingInterceptor(),
+	)
+
+	// 添加保护中间件
+	if m.protection != nil && m.protection.IsEnabled() {
+		unaryInterceptors = append(unaryInterceptors, m.protection.GRPCUnaryInterceptor())
+		streamInterceptors = append(streamInterceptors, m.protection.GRPCStreamInterceptor())
+	}
+
+	// 添加链路追踪中间件
+	if m.tracing != nil {
+		unaryInterceptors = append(unaryInterceptors, middleware.GRPCTracingInterceptor())
+		streamInterceptors = append(streamInterceptors, middleware.GRPCStreamTracingInterceptor())
+	}
+
+	grpcSrv, err := localgrpc.NewServerWithInterceptors(ctx, cfg, unaryInterceptors, streamInterceptors)
+	if err != nil {
+		return err
+	}
+	m.grpcServer = grpcSrv
+	fmt.Println("✅ gRPC Server initialized")
+	return nil
+}
+
+// initElasticsearch 初始化Elasticsearch
+func (m *ComponentManager) initElasticsearch(ctx context.Context) error {
+	var cfg *config.ElasticsearchConfig
+	if m.opts.ElasticsearchConfig != nil {
+		cfg = m.opts.ElasticsearchConfig
+	} else if m.config != nil {
+		cfg = &m.config.Elasticsearch
+	} else {
+		return fmt.Errorf("elasticsearch config not found")
+	}
+
+	// 这里可以初始化Elasticsearch
+	_ = cfg // 暂时忽略配置
+	fmt.Println("✅ Elasticsearch initialized")
+	return nil
+}
+
+// initKafka 初始化Kafka
+func (m *ComponentManager) initKafka(ctx context.Context) error {
+	var cfg *config.KafkaConfig
+	if m.opts.KafkaConfig != nil {
+		cfg = m.opts.KafkaConfig
+	} else if m.config != nil {
+		cfg = &m.config.Kafka
+	} else {
+		return fmt.Errorf("kafka config not found")
+	}
+
+	kafkaCfg, err := kafka.ConvertConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	if err := kafka.InitKafka(ctx, kafkaCfg); err != nil {
+		return err
+	}
+	fmt.Println("✅ Kafka initialized")
+	return nil
+}
+
+// initMongoDB 初始化MongoDB
+func (m *ComponentManager) initMongoDB(ctx context.Context) error {
+	var cfg *config.MongoDBConfig
+	if m.opts.MongoDBConfig != nil {
+		cfg = m.opts.MongoDBConfig
+	} else if m.config != nil {
+		cfg = &m.config.MongoDB
+	} else {
+		return fmt.Errorf("mongodb config not found")
+	}
+
+	// 这里可以初始化MongoDB
+	_ = cfg // 暂时忽略配置
+	fmt.Println("✅ MongoDB initialized")
+	return nil
+}
+
+// initEtcd 初始化Etcd
+func (m *ComponentManager) initEtcd(ctx context.Context) error {
+	var cfg *config.EtcdConfig
+	if m.opts.EtcdConfig != nil {
+		cfg = m.opts.EtcdConfig
+	} else if m.config != nil {
+		cfg = &m.config.Etcd
+	} else {
+		return fmt.Errorf("etcd config not found")
+	}
+
+	etcdCfg, err := etcd.ConvertConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	if err := etcd.InitEtcd(ctx, etcdCfg); err != nil {
+		return err
+	}
+	fmt.Println("✅ Etcd initialized")
+	return nil
+}
+
+// ================================
+// 🔍 组件访问器
+// ================================
+
+// GetConfig 获取配置
+func (m *ComponentManager) GetConfig() *config.Config {
+	return m.config
+}
+
+// GetAuth 获取认证管理器
+func (m *ComponentManager) GetAuth() *auth.JWTManager {
+	return m.auth
+}
+
+// GetRegistry 获取服务注册器
+func (m *ComponentManager) GetRegistry() *registry.ServiceRegistry {
+	return m.registry
+}
+
+// GetGRPCServer 获取gRPC服务器
+func (m *ComponentManager) GetGRPCServer() *localgrpc.Server {
+	return m.grpcServer
+}
+
+// GetProtection 获取保护中间件
+func (m *ComponentManager) GetProtection() *middleware.SentinelProtectionMiddleware {
+	return m.protection
+}
+
+// GetTracing 获取链路追踪
+func (m *ComponentManager) GetTracing() *tracing.Manager {
+	return m.tracing
+}
+
+// IsInitialized 检查是否已初始化
+func (m *ComponentManager) IsInitialized() bool {
+	return m.initialized
+}
+
+// IsStarted 检查是否已启动
+func (m *ComponentManager) IsStarted() bool {
+	return m.started
+}

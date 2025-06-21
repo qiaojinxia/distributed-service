@@ -3,8 +3,8 @@ package test
 import (
 	"testing"
 
-	"distributed-service/pkg/config"
-	"distributed-service/pkg/protection"
+	"distributed-service/framework/config"
+	"distributed-service/framework/protection"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
