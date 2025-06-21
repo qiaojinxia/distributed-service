@@ -1,4 +1,4 @@
-module distributed-service
+module github.com/qiaojinxia/distributed-service
 
 go 1.23.8
 
