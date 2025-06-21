@@ -9,6 +9,9 @@ RUN apk add --no-cache git ca-certificates tzdata
 
 # 复制 go mod 文件
 COPY go.mod go.sum ./
+ENV GOPROXY=https://goproxy.cn,direct
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
+    apk add --no-cache git
 
 # 下载依赖
 RUN go mod download

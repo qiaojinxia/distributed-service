@@ -140,22 +140,14 @@ func GRPCMetricsInterceptor() grpc.UnaryServerInterceptor {
 		duration := time.Since(start)
 
 		// Record metrics
-		serviceName := getServiceName(info.FullMethod)
 		methodName := getMethodName(info.FullMethod)
-
-		labels := []string{
-			"service", serviceName,
-			"method", methodName,
-		}
-
+		status := "success"
 		if err != nil {
-			labels = append(labels, "status", "error")
-		} else {
-			labels = append(labels, "status", "success")
+			status = "error"
 		}
 
-		metrics.GRPCRequestsTotal.WithLabelValues(labels[1], labels[3], labels[5]).Inc()
-		metrics.GRPCRequestDuration.WithLabelValues(labels[1], labels[3]).Observe(duration.Seconds())
+		metrics.GRPCRequestsTotal.WithLabelValues(methodName, status).Inc()
+		metrics.GRPCRequestDuration.WithLabelValues(methodName, status).Observe(duration.Seconds())
 
 		return resp, err
 	}

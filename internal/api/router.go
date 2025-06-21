@@ -3,6 +3,7 @@ package api
 import (
 	"distributed-service/internal/service"
 	"distributed-service/pkg/auth"
+	"distributed-service/pkg/config"
 	"distributed-service/pkg/logger"
 	"distributed-service/pkg/middleware"
 	"net/http"
@@ -24,7 +25,7 @@ import (
 // @in header
 // @name Authorization
 // @description Type "Bearer" followed by a space and JWT token.
-func RegisterRoutes(r *gin.Engine, userService service.UserService, jwtManager *auth.JWTManager) {
+func RegisterRoutes(r *gin.Engine, userService service.UserService, jwtManager *auth.JWTManager, cfg *config.Config) {
 	ctx := context.Background()
 
 	logger.Info(ctx, "API routes initialized with Sentinel protection")
@@ -58,6 +59,15 @@ func RegisterRoutes(r *gin.Engine, userService service.UserService, jwtManager *
 			},
 		})
 	})
+
+	// Initialize monitoring handler
+	monitorHandler := NewMonitorHandler(cfg)
+
+	// Monitoring dashboard (public access)
+	r.GET("/monitor", monitorHandler.GetSimpleDashboard)          // 默认精简模式
+	r.GET("/monitor/simple", monitorHandler.GetSimpleDashboard)   // 精简模式
+	r.GET("/monitor/full", monitorHandler.GetFullDashboard)       // 完整模式
+	r.GET("/monitor/details/:type", monitorHandler.GetDetailPage) // 详细信息页面
 
 	// API v1
 	v1 := r.Group("/api/v1")
@@ -93,6 +103,17 @@ func RegisterRoutes(r *gin.Engine, userService service.UserService, jwtManager *
 			usersProtected.GET("/me", userHandler.GetByID)    // Get current user info
 			usersProtected.POST("", userHandler.Create)       // Create new user
 			usersProtected.DELETE("/:id", userHandler.Delete) // Delete user
+		}
+
+		// Monitoring routes (public access for system monitoring)
+		monitor := v1.Group("/monitor")
+		{
+			monitor.GET("/system", monitorHandler.GetSystemStats)
+			monitor.GET("/services", monitorHandler.GetServicesStats)
+			monitor.GET("/process", monitorHandler.GetProcessStats)
+			monitor.GET("/stats", monitorHandler.GetOverallStats)
+			monitor.GET("/health", monitorHandler.HealthCheck)
+			monitor.GET("/metrics/history", monitorHandler.GetMetricsHistory)
 		}
 	}
 }

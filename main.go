@@ -229,7 +229,7 @@ func main() {
 		logger.String("middleware_chain", "recovery->logging->context->protection->tracing->metrics"))
 
 	// Register routes with JWT manager
-	api.RegisterRoutes(r, userService, jwtManager)
+	api.RegisterRoutes(r, userService, jwtManager, &config.GlobalConfig)
 
 	// Register service with Consul
 	if err := serviceRegistry.RegisterService(ctx, &config.GlobalConfig.Server); err != nil {
