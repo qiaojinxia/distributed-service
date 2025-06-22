@@ -3,10 +3,11 @@ package kafka
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/Shopify/sarama"
 	"github.com/qiaojinxia/distributed-service/framework/config"
 	"github.com/qiaojinxia/distributed-service/framework/logger"
-	"time"
 )
 
 // Client Kafka客户端
@@ -156,7 +157,7 @@ func (c *Client) CreateProducer() error {
 	}
 
 	c.producer = producer
-	c.logger.Info("Kafka producer created")
+	c.logger.Info(context.Background(), "Kafka producer created")
 	return nil
 }
 
@@ -172,7 +173,7 @@ func (c *Client) CreateConsumer() error {
 	}
 
 	c.consumer = consumer
-	c.logger.Info("Kafka consumer created")
+	c.logger.Info(context.Background(), "Kafka consumer created")
 	return nil
 }
 
@@ -195,7 +196,7 @@ func (c *Client) SendMessage(ctx context.Context, topic string, key, value []byt
 		return fmt.Errorf("failed to send message: %w", err)
 	}
 
-	c.logger.Debugf("Message sent to topic %s, partition %d, offset %d", topic, partition, offset)
+	c.logger.Debugf(context.Background(), "Message sent to topic %s, partition %d, offset %d", topic, partition, offset)
 	return nil
 }
 
@@ -226,7 +227,7 @@ func (c *Client) SendMessageWithHeaders(ctx context.Context, topic string, key, 
 		return fmt.Errorf("failed to send message with headers: %w", err)
 	}
 
-	c.logger.Debugf("Message with headers sent to topic %s, partition %d, offset %d", topic, partition, offset)
+	c.logger.Debugf(context.Background(), "Message with headers sent to topic %s, partition %d, offset %d", topic, partition, offset)
 	return nil
 }
 
@@ -250,7 +251,7 @@ func (c *Client) ConsumeMessages(ctx context.Context, topics []string, handler M
 		default:
 			err := c.consumer.Consume(ctx, topics, consumerHandler)
 			if err != nil {
-				c.logger.Errorf("Error from consumer: %v", err)
+				c.logger.Errorf(context.Background(), "Error from consumer: %v", err)
 				return err
 			}
 		}
@@ -301,7 +302,7 @@ func (c *Client) Close() error {
 		return fmt.Errorf("kafka close errors: %v", errs)
 	}
 
-	c.logger.Info("Kafka client closed")
+	c.logger.Info(context.Background(), "Kafka client closed")
 	return nil
 }
 
@@ -341,7 +342,7 @@ func (h *consumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 
 		// 处理消息
 		if err := h.handler(session.Context(), msg); err != nil {
-			h.logger.Errorf("Message handler error: %v", err)
+			h.logger.Errorf(context.Background(), "Message handler error: %v", err)
 			continue
 		}
 
@@ -390,7 +391,7 @@ func InitKafka(_ context.Context, cfg *Config) error {
 	}
 
 	globalClient = client
-	logger.GetLogger().Info("Kafka client initialized successfully")
+	logger.GetLogger().Info(context.Background(), "Kafka client initialized successfully")
 	return nil
 }
 

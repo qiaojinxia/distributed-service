@@ -3,6 +3,7 @@ package mongodb
 import (
 	"context"
 	"fmt"
+
 	"github.com/qiaojinxia/distributed-service/framework/config"
 	"github.com/qiaojinxia/distributed-service/framework/logger"
 )
@@ -16,22 +17,35 @@ type Client struct {
 
 // Config MongoDB配置
 type Config struct {
-	URI            string `yaml:"uri" json:"uri"`
-	Database       string `yaml:"database" json:"database"`
-	Username       string `yaml:"username" json:"username"`
-	Password       string `yaml:"password" json:"password"`
-	AuthDatabase   string `yaml:"auth_database" json:"auth_database"`
-	MaxPoolSize    int    `yaml:"max_pool_size" json:"max_pool_size"`
-	MinPoolSize    int    `yaml:"min_pool_size" json:"min_pool_size"`
-	MaxIdleTimeMS  int    `yaml:"max_idle_time_ms" json:"max_idle_time_ms"`
-	ConnectTimeout int    `yaml:"connect_timeout" json:"connect_timeout"`
-	SocketTimeout  int    `yaml:"socket_timeout" json:"socket_timeout"`
+	URI      string `yaml:"uri" json:"uri"`           // MongoDB连接URI
+	Database string `yaml:"database" json:"database"` // 数据库名称
+	Username string `yaml:"username" json:"username"` // 用户名
+	Password string `yaml:"password" json:"password"` // 密码
+
+	// 连接池配置
+	MaxPoolSize     int `yaml:"max_pool_size" json:"max_pool_size"`       // 最大连接池大小
+	MinPoolSize     int `yaml:"min_pool_size" json:"min_pool_size"`       // 最小连接池大小
+	MaxIdleTime     int `yaml:"max_idle_time" json:"max_idle_time"`       // 最大空闲时间(秒)
+	ConnectTimeout  int `yaml:"connect_timeout" json:"connect_timeout"`   // 连接超时(秒)
+	ServerTimeout   int `yaml:"server_timeout" json:"server_timeout"`     // 服务器选择超时(秒)
+	SocketTimeout   int `yaml:"socket_timeout" json:"socket_timeout"`     // 套接字超时(秒)
+	HeartbeatFreq   int `yaml:"heartbeat_freq" json:"heartbeat_freq"`     // 心跳频率(秒)
+	CompressorLevel int `yaml:"compressor_level" json:"compressor_level"` // 压缩级别
+
+	// TLS配置
+	TLS struct {
+		Enable   bool   `yaml:"enable" json:"enable"`
+		CertFile string `yaml:"cert_file" json:"cert_file"`
+		KeyFile  string `yaml:"key_file" json:"key_file"`
+		CAFile   string `yaml:"ca_file" json:"ca_file"`
+	} `yaml:"tls" json:"tls"`
 }
 
 // Database 数据库接口
 type Database interface {
 	Collection(name string) Collection
 	RunCommand(ctx context.Context, command interface{}) (interface{}, error)
+	Drop(ctx context.Context) error
 	Ping(ctx context.Context) error
 }
 
@@ -66,10 +80,7 @@ func NewClient(cfg *Config) (*Client, error) {
 
 // Connect 连接到MongoDB
 func (c *Client) Connect(ctx context.Context) error {
-	// 这里会使用实际的MongoDB驱动连接
-	// 例如使用 go.mongodb.org/mongo-driver/mongo
-
-	c.logger.Infof("Connecting to MongoDB: %s", c.config.URI)
+	c.logger.Infof(context.Background(), "Connecting to MongoDB: %s", c.config.URI)
 
 	// 模拟连接逻辑
 	db := &database{
@@ -79,7 +90,17 @@ func (c *Client) Connect(ctx context.Context) error {
 	}
 
 	c.database = db
-	c.logger.Info("MongoDB connected successfully")
+	c.logger.Info(context.Background(), "Connected to MongoDB successfully")
+	return nil
+}
+
+// Disconnect 断开连接
+func (c *Client) Disconnect(ctx context.Context) error {
+	if c.database == nil {
+		return nil
+	}
+
+	c.logger.Info(context.Background(), "Disconnected from MongoDB")
 	return nil
 }
 
@@ -99,7 +120,7 @@ func (c *Client) Ping(ctx context.Context) error {
 
 // Close 关闭连接
 func (c *Client) Close() error {
-	c.logger.Info("MongoDB client closed")
+	c.logger.Info(context.Background(), "MongoDB client closed")
 	return nil
 }
 
@@ -119,12 +140,17 @@ func (d *database) Collection(name string) Collection {
 }
 
 func (d *database) RunCommand(ctx context.Context, command interface{}) (interface{}, error) {
-	d.logger.Infof("Running command on database: %s", d.name)
+	d.logger.Infof(context.Background(), "Running command on database: %s", d.name)
 	return nil, nil
 }
 
+func (d *database) Drop(ctx context.Context) error {
+	d.logger.Info(context.Background(), "Dropping MongoDB database")
+	return nil
+}
+
 func (d *database) Ping(ctx context.Context) error {
-	d.logger.Info("Pinging MongoDB")
+	d.logger.Info(context.Background(), "Pinging MongoDB")
 	return nil
 }
 
@@ -136,47 +162,47 @@ type collection struct {
 }
 
 func (c *collection) InsertOne(ctx context.Context, document interface{}) (interface{}, error) {
-	c.logger.Infof("Inserting document into collection: %s", c.name)
+	c.logger.Infof(ctx, "Inserting document into collection: %s", c.name)
 	return "generated_id", nil
 }
 
 func (c *collection) InsertMany(ctx context.Context, documents []interface{}) ([]interface{}, error) {
-	c.logger.Infof("Inserting %d documents into collection: %s", len(documents), c.name)
+	c.logger.Infof(ctx, "Inserting %d documents into collection: %s", len(documents), c.name)
 	return make([]interface{}, len(documents)), nil
 }
 
 func (c *collection) FindOne(ctx context.Context, filter interface{}) (interface{}, error) {
-	c.logger.Infof("Finding one document in collection: %s", c.name)
+	c.logger.Infof(ctx, "Finding one document in collection: %s", c.name)
 	return nil, nil
 }
 
 func (c *collection) Find(ctx context.Context, filter interface{}) ([]interface{}, error) {
-	c.logger.Infof("Finding documents in collection: %s", c.name)
+	c.logger.Infof(ctx, "Finding documents in collection: %s", c.name)
 	return nil, nil
 }
 
 func (c *collection) UpdateOne(ctx context.Context, filter, update interface{}) error {
-	c.logger.Infof("Updating one document in collection: %s", c.name)
+	c.logger.Infof(ctx, "Updating one document in collection: %s", c.name)
 	return nil
 }
 
 func (c *collection) UpdateMany(ctx context.Context, filter, update interface{}) error {
-	c.logger.Infof("Updating many documents in collection: %s", c.name)
+	c.logger.Infof(context.Background(), "Updating many documents in collection: %s", c.name)
 	return nil
 }
 
 func (c *collection) DeleteOne(ctx context.Context, filter interface{}) error {
-	c.logger.Infof("Deleting one document from collection: %s", c.name)
+	c.logger.Infof(context.Background(), "Deleting one document from collection: %s", c.name)
 	return nil
 }
 
 func (c *collection) DeleteMany(ctx context.Context, filter interface{}) error {
-	c.logger.Infof("Deleting many documents from collection: %s", c.name)
+	c.logger.Infof(context.Background(), "Deleting many documents from collection: %s", c.name)
 	return nil
 }
 
 func (c *collection) CountDocuments(ctx context.Context, filter interface{}) (int64, error) {
-	c.logger.Infof("Counting documents in collection: %s", c.name)
+	c.logger.Infof(context.Background(), "Counting documents in collection: %s", c.name)
 	return 0, nil
 }
 
@@ -187,12 +213,22 @@ func ConvertConfig(cfg *config.MongoDBConfig) (*Config, error) {
 		Database:       cfg.Database,
 		Username:       cfg.Username,
 		Password:       cfg.Password,
-		AuthDatabase:   cfg.AuthDatabase,
 		MaxPoolSize:    cfg.MaxPoolSize,
 		MinPoolSize:    cfg.MinPoolSize,
-		MaxIdleTimeMS:  cfg.MaxIdleTimeMS,
+		MaxIdleTime:    cfg.MaxIdleTimeMS,
 		ConnectTimeout: cfg.ConnectTimeout,
 		SocketTimeout:  cfg.SocketTimeout,
+		TLS: struct {
+			Enable   bool   `yaml:"enable" json:"enable"`
+			CertFile string `yaml:"cert_file" json:"cert_file"`
+			KeyFile  string `yaml:"key_file" json:"key_file"`
+			CAFile   string `yaml:"ca_file" json:"ca_file"`
+		}{
+			Enable:   cfg.TLS.Enable,
+			CertFile: cfg.TLS.CertFile,
+			KeyFile:  cfg.TLS.KeyFile,
+			CAFile:   cfg.TLS.CAFile,
+		},
 	}, nil
 }
 
@@ -217,19 +253,16 @@ func InitMongoDB(ctx context.Context, cfg *Config) error {
 	}
 
 	globalClient = client
-	logger.GetLogger().Info("MongoDB client initialized successfully")
+	logger.GetLogger().Info(context.Background(), "MongoDB client initialized successfully")
 	return nil
+}
+
+// GetGlobalDatabase 获取全局数据库实例
+func GetGlobalDatabase() Database {
+	return globalClient.Database()
 }
 
 // GetClient 获取全局MongoDB客户端
 func GetClient() *Client {
 	return globalClient
-}
-
-// GetDatabase 获取全局数据库实例
-func GetDatabase() Database {
-	if globalClient == nil {
-		return nil
-	}
-	return globalClient.Database()
 }

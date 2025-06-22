@@ -3,10 +3,11 @@ package etcd
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/qiaojinxia/distributed-service/framework/config"
 	"github.com/qiaojinxia/distributed-service/framework/logger"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"time"
 )
 
 // Client Etcd客户端
@@ -212,7 +213,7 @@ func (c *Client) Watch(ctx context.Context, key string, callback WatchCallback) 
 				}
 
 				if err := callback(watchEvent); err != nil {
-					c.logger.Errorf("Watch callback error: %v", err)
+					c.logger.Errorf(context.Background(), "Watch callback error: %v", err)
 				}
 			}
 		}
@@ -244,7 +245,7 @@ func (c *Client) WatchWithPrefix(ctx context.Context, prefix string, callback Wa
 				}
 
 				if err := callback(watchEvent); err != nil {
-					c.logger.Errorf("Watch callback error: %v", err)
+					c.logger.Errorf(context.Background(), "Watch callback error: %v", err)
 				}
 			}
 		}
@@ -360,12 +361,11 @@ func (c *Client) Ping(ctx context.Context) error {
 
 // Close 关闭客户端
 func (c *Client) Close() error {
-	err := c.client.Close()
-	if err != nil {
-		c.logger.Errorf("Etcd client close failed: %v", err)
+	if err := c.client.Close(); err != nil {
+		c.logger.Errorf(context.Background(), "Etcd client close failed: %v", err)
 		return err
 	}
-	c.logger.Info("Etcd client closed")
+	c.logger.Info(context.Background(), "Etcd client closed")
 	return nil
 }
 
@@ -407,7 +407,7 @@ func InitEtcd(ctx context.Context, cfg *Config) error {
 	}
 
 	globalClient = client
-	logger.GetLogger().Info("Etcd client initialized successfully")
+	logger.GetLogger().Info(context.Background(), "Etcd client initialized successfully")
 	return nil
 }
 

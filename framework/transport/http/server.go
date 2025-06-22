@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/qiaojinxia/distributed-service/framework/config"
 	"github.com/qiaojinxia/distributed-service/framework/logger"
 	"github.com/qiaojinxia/distributed-service/framework/middleware"
-	"net/http"
-	"time"
 )
 
 // Server HTTP服务器
@@ -123,7 +124,7 @@ func (s *Server) Start(ctx context.Context) error {
 		IdleTimeout:  s.config.IdleTimeout,
 	}
 
-	s.logger.Infof("🌐 HTTP Server starting on %s (mode: %s)", addr, s.config.Mode)
+	s.logger.Infof(context.Background(), "🌐 HTTP Server starting on %s (mode: %s)", addr, s.config.Mode)
 
 	// 启动服务器
 	go func() {
@@ -135,7 +136,7 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			s.logger.Errorf("HTTP Server start failed: %v", err)
+			s.logger.Errorf(context.Background(), "HTTP Server start failed: %v", err)
 		}
 	}()
 
@@ -148,18 +149,18 @@ func (s *Server) Stop(ctx context.Context) error {
 		return nil
 	}
 
-	s.logger.Info("🛑 Stopping HTTP Server...")
+	s.logger.Info(context.Background(), "🛑 Stopping HTTP Server...")
 
 	// 优雅关闭
 	shutdownCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	if err := s.server.Shutdown(shutdownCtx); err != nil {
-		s.logger.Errorf("HTTP Server shutdown failed: %v", err)
+		s.logger.Errorf(context.Background(), "HTTP Server shutdown failed: %v", err)
 		return err
 	}
 
-	s.logger.Info("✅ HTTP Server stopped")
+	s.logger.Info(context.Background(), "✅ HTTP Server stopped")
 	return nil
 }
 

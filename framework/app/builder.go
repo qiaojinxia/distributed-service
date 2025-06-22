@@ -561,18 +561,18 @@ func (b *Builder) setupDefaults() {
 
 // build 构建应用
 func (b *Builder) build() error {
-	log := logger.GetLogger()
-	log.Info("🔧 Building app",
+
+	logger.Info(context.Background(), "🔧 Building app",
 		logger.String("name", b.app.opts.Name),
 		logger.String("version", b.app.opts.Version))
-	log.Info("📡 Service configuration",
+	logger.Info(context.Background(), "📡 Service configuration",
 		logger.Bool("HTTP", b.app.opts.EnableHTTP),
 		logger.Bool("gRPC", b.app.opts.EnableGRPC),
 		logger.Bool("Metrics", b.app.opts.EnableMetrics),
 		logger.Bool("Tracing", b.app.opts.EnableTracing))
 
 	// 初始化组件管理器
-	log.Info("🔧 Initializing components...")
+	logger.Info(context.Background(), "🔧 Initializing components...")
 	if err := b.componentManager.Init(b.app.ctx); err != nil {
 		return fmt.Errorf("failed to init components: %w", err)
 	}
@@ -599,7 +599,7 @@ func (b *Builder) build() error {
 
 // setupHTTPTransport 设置HTTP传输层
 func (b *Builder) setupHTTPTransport() error {
-	log := logger.GetLogger()
+
 	// 导入HTTP包
 	httpTransport := &HTTPTransport{
 		port:     b.app.opts.Port,
@@ -608,23 +608,35 @@ func (b *Builder) setupHTTPTransport() error {
 	}
 
 	b.app.AddTransport(httpTransport)
-	log.Info("✅ HTTP transport configured")
+	logger.Info(context.Background(), "✅ HTTP transport configured")
 	return nil
 }
 
 // setupGRPCTransport 设置gRPC传输层
 func (b *Builder) setupGRPCTransport() error {
-	log := logger.GetLogger()
+
+	// 将 gRPC 处理器传递给组件管理器
+	if len(b.grpcHandlers) > 0 {
+		// 转换处理器类型
+		var handlers []component.GRPCHandler
+		for _, h := range b.grpcHandlers {
+			handlers = append(handlers, component.GRPCHandler(h))
+		}
+
+		// 设置 gRPC 处理器
+		b.componentManager.SetGRPCHandlers(handlers)
+	}
+
 	// gRPC已经在组件管理器中处理
-	log.Info("✅ gRPC transport configured (via component manager)")
+	logger.Info(context.Background(), "✅ gRPC transport configured (via component manager)")
 	return nil
 }
 
 // defaultHTTPHandler 默认HTTP处理器
 func defaultHTTPHandler(r interface{}) {
-	log := logger.GetLogger()
+
 	// 这里会在 transport/http 中实现具体的路由
-	log.Info("📡 Setting up default HTTP routes...")
+	logger.Info(context.Background(), "📡 Setting up default HTTP routes...")
 }
 
 // ================================

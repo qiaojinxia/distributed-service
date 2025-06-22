@@ -3,6 +3,7 @@ package tracing
 import (
 	"context"
 	"fmt"
+
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
@@ -111,9 +112,35 @@ func newExporter(ctx context.Context, config *Config) (sdktrace.SpanExporter, er
 		return stdouttrace.New(
 			stdouttrace.WithPrettyPrint(),
 		)
+	case "none", "noop", "":
+		// 返回空导出器，不输出任何span信息，只保留trace_id在日志中
+		return &noopExporter{}, nil
 	default:
-		return stdouttrace.New(
-			stdouttrace.WithPrettyPrint(),
-		)
+		// 默认使用none导出器，避免冗长输出
+		return &noopExporter{}, nil
 	}
+}
+
+// DefaultConfig 默认配置
+func DefaultConfig() *Config {
+	return &Config{
+		ServiceName:    "distributed-service",
+		ServiceVersion: "v1.0.0",
+		Environment:    "development",
+		Enabled:        true,
+		ExporterType:   "none", // 默认使用none，避免冗长输出
+		SampleRatio:    1.0,
+	}
+}
+
+// noopExporter 空导出器，不输出任何span信息
+type noopExporter struct{}
+
+func (e *noopExporter) ExportSpans(context.Context, []sdktrace.ReadOnlySpan) error {
+	// 不做任何操作，静默处理，只保留trace_id在日志中
+	return nil
+}
+
+func (e *noopExporter) Shutdown(context.Context) error {
+	return nil
 }

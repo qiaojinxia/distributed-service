@@ -3,6 +3,7 @@ package tracing
 import (
 	"context"
 	"fmt"
+
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -159,4 +160,33 @@ func WithSpanResult[T any](ctx context.Context, spanName string, fn func(ctx con
 
 	span.SetStatus(codes.Ok, "")
 	return result, nil
+}
+
+// GetTraceID 从上下文中获取 trace ID
+func GetTraceID(ctx context.Context) string {
+	span := trace.SpanFromContext(ctx)
+	if span.SpanContext().IsValid() {
+		return span.SpanContext().TraceID().String()
+	}
+	return ""
+}
+
+// GetSpanID 从上下文中获取 span ID
+func GetSpanID(ctx context.Context) string {
+	span := trace.SpanFromContext(ctx)
+	if span.SpanContext().IsValid() {
+		return span.SpanContext().SpanID().String()
+	}
+	return ""
+}
+
+// GetTraceContext 从上下文中获取完整的追踪上下文信息
+func GetTraceContext(ctx context.Context) (string, string, bool) {
+	span := trace.SpanFromContext(ctx)
+	if span.SpanContext().IsValid() {
+		return span.SpanContext().TraceID().String(),
+			span.SpanContext().SpanID().String(),
+			span.SpanContext().IsSampled()
+	}
+	return "", "", false
 }

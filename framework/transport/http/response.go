@@ -1,8 +1,11 @@
 package http
 
 import (
-	"github.com/gin-gonic/gin"
+	"context"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Response 标准响应结构
@@ -77,12 +80,28 @@ func (r *ResponseHandler) JSON(c *gin.Context, code int, data interface{}) {
 
 // getTraceID 获取链路追踪ID
 func getTraceID(c *gin.Context) string {
+	// 1. 首先尝试从 OpenTelemetry span context 中获取
+	if span := trace.SpanFromContext(c.Request.Context()); span.SpanContext().IsValid() {
+		return span.SpanContext().TraceID().String()
+	}
+
+	// 2. 尝试从 gin context 中获取（如果有其他中间件设置）
+	if ctx, exists := c.Get("ctx"); exists {
+		if span := trace.SpanFromContext(ctx.(context.Context)); span.SpanContext().IsValid() {
+			return span.SpanContext().TraceID().String()
+		}
+	}
+
+	// 3. 尝试从 HTTP 头中获取
 	if traceID := c.GetHeader("X-Trace-ID"); traceID != "" {
 		return traceID
 	}
+
+	// 4. 尝试从 gin context 中的字符串值获取
 	if traceID := c.GetString("trace_id"); traceID != "" {
 		return traceID
 	}
+
 	return ""
 }
 

@@ -1,0 +1,64 @@
+2025/06/21 21:07:33 🚀 启动HTTP测试服务...
+🔧 Building app: http-test (v1.0.0)
+📡 HTTP: true, gRPC: false, Metrics: true, Tracing: true
+🔧 Initializing components...
+🔧 Initializing components...
+✅ Config loaded
+✅ Logger initialized
+2025-06-21T21:07:33.612+0800	info	logger/logger.go:93	Initializing MySQL connection	{"host": "localhost", "port": 3306, "database": "distributed_service"}
+2025-06-21T21:07:33.633+0800	info	logger/logger.go:93	Successfully connected to MySQL	{"host": "localhost", "port": 3306, "database": "distributed_service"}
+✅ Database initialized
+2025-06-21T21:07:33.634+0800	info	logger/logger.go:93	Initializing Redis connection	{"host": "localhost", "port": 6379, "db": 0}
+2025-06-21T21:07:33.637+0800	info	logger/logger.go:93	Successfully connected to Redis	{"host": "localhost", "port": 6379, "db": 0}
+✅ Redis initialized
+✅ Auth initialized
+✅ Tracing initialized
+✅ Metrics initialized
+{"timestamp":"2025-06-21 21:07:33.33210","caller":"config.go:78","logLevel":"INFO","msg":"[Config] Print effective global config","globalConfig":{"Version":"v1","Sentinel":{"App":{"Name":"unknown_go_service","Type":0},"Exporter":{"Metric":{"HttpAddr":"","HttpPath":""}},"Log":{"Logger":{},"Dir":"/Users/caomaoboy/logs/csp","UsePid":false,"Metric":{"SingleFileMaxSize":52428800,"MaxFileCount":8,"FlushIntervalSec":1}},"Stat":{"GlobalStatisticSampleCountTotal":20,"GlobalStatisticIntervalMsTotal":10000,"MetricStatisticSampleCount":2,"MetricStatisticIntervalMs":1000,"System":{"CollectIntervalMs":1000,"CollectLoadIntervalMs":1000,"CollectCpuIntervalMs":1000,"CollectMemoryIntervalMs":150}},"UseCacheTime":false}}}
+{"timestamp":"2025-06-21 21:07:33.33210","caller":"writer.go:189","logLevel":"INFO","msg":"[MetricWriter] Metric log file removed in DefaultMetricLogWriter.removeDeprecatedFiles()","filename":"/Users/caomaoboy/logs/csp/unknown_go_service-metrics.log.2025-06-21.2"}
+{"timestamp":"2025-06-21 21:07:33.33210","caller":"writer.go:196","logLevel":"INFO","msg":"[MetricWriter] Metric index file removed","idxFilename":"/Users/caomaoboy/logs/csp/unknown_go_service-metrics.log.2025-06-21.2.idx"}
+{"timestamp":"2025-06-21 21:07:33.33210","caller":"writer.go:247","logLevel":"INFO","msg":"[MetricWriter] New metric log file created","filename":"/Users/caomaoboy/logs/csp/unknown_go_service-metrics.log.2025-06-21.10"}
+{"timestamp":"2025-06-21 21:07:33.33210","caller":"writer.go:254","logLevel":"INFO","msg":"[MetricWriter] New metric log index file created","idxFile":"/Users/caomaoboy/logs/csp/unknown_go_service-metrics.log.2025-06-21.10.idx"}
+2025-06-21T21:07:33.642+0800	info	logger/logger.go:93	Sentinel initialized successfully with wildcard matching support
+{"timestamp":"2025-06-21 21:07:33.33210","caller":"rule_manager.go:173","logLevel":"INFO","msg":"[FlowRuleManager] Flow rules were loaded","rules":[{"resource":"/health","tokenCalculateStrategy":0,"controlBehavior":0,"threshold":2,"relationStrategy":0,"refResource":"","maxQueueingTimeMs":0,"warmUpPeriodSec":0,"warmUpColdFactor":0,"statIntervalInMs":1000,"lowMemUsageThreshold":0,"highMemUsageThreshold":0,"memLowWaterMarkBytes":0,"memHighWaterMarkBytes":0}]}
+2025-06-21T21:07:33.642+0800	info	logger/logger.go:93	Flow rule configured	{"name": "health_check_limiter", "pattern": "/health", "priority": 1, "is_pattern": false}
+2025-06-21T21:07:33.642+0800	info	logger/logger.go:93	Flow rule configured	{"name": "health_check_limiter", "resource": "/health", "threshold": 2, "interval_ms": 1000, "is_wildcard": false}
+2025-06-21T21:07:33.642+0800	info	logger/logger.go:93	Flow rule configured	{"name": "auth_api_limiter", "pattern": "/api/v1/auth/*", "priority": 2, "is_pattern": true}
+2025-06-21T21:07:33.642+0800	info	logger/logger.go:93	Flow rule configured	{"name": "auth_api_limiter", "resource": "/api/v1/auth/*", "threshold": 10, "interval_ms": 60000, "is_wildcard": true}
+2025-06-21T21:07:33.642+0800	info	logger/logger.go:93	Flow rule configured	{"name": "users_api_limiter", "pattern": "/api/v1/users/*", "priority": 2, "is_pattern": true}
+2025-06-21T21:07:33.642+0800	info	logger/logger.go:93	Flow rule configured	{"name": "users_api_limiter", "resource": "/api/v1/users/*", "threshold": 30, "interval_ms": 60000, "is_wildcard": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Flow rule configured	{"name": "api_general_limiter", "pattern": "/api/*", "priority": 3, "is_pattern": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Flow rule configured	{"name": "api_general_limiter", "resource": "/api/*", "threshold": 100, "interval_ms": 60000, "is_wildcard": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Flow rule configured	{"name": "protection_status_limiter", "pattern": "/protection/*", "priority": 3, "is_pattern": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Flow rule configured	{"name": "protection_status_limiter", "resource": "/protection/*", "threshold": 20, "interval_ms": 1000, "is_wildcard": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Flow rule configured	{"name": "grpc_user_service_limiter", "pattern": "/grpc/user_service/*", "priority": 2, "is_pattern": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Flow rule configured	{"name": "grpc_user_service_limiter", "resource": "/grpc/user_service/*", "threshold": 50, "interval_ms": 1000, "is_wildcard": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Flow rule configured	{"name": "grpc_read_operations_limiter", "pattern": "/grpc/*/get*,/grpc/*/list*,/grpc/*/find*", "priority": 4, "is_pattern": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Flow rule configured	{"name": "grpc_read_operations_limiter", "resource": "/grpc/*/get*,/grpc/*/list*,/grpc/*/find*", "threshold": 80, "interval_ms": 1000, "is_wildcard": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Flow rule configured	{"name": "grpc_write_operations_limiter", "pattern": "/grpc/*/create*,/grpc/*/update*,/grpc/*/delete*", "priority": 4, "is_pattern": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Flow rule configured	{"name": "grpc_write_operations_limiter", "resource": "/grpc/*/create*,/grpc/*/update*,/grpc/*/delete*", "threshold": 10, "interval_ms": 60000, "is_wildcard": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Circuit breaker rule configured	{"name": "auth_api_circuit", "pattern": "/api/v1/auth/*", "priority": 2, "is_pattern": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Circuit breaker configured	{"name": "auth_api_circuit", "resource": "/api/v1/auth/*", "strategy": "ErrorRatio", "threshold": 0.5, "is_wildcard": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Circuit breaker rule configured	{"name": "users_api_circuit", "pattern": "/api/v1/users/*", "priority": 2, "is_pattern": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Circuit breaker configured	{"name": "users_api_circuit", "resource": "/api/v1/users/*", "strategy": "ErrorRatio", "threshold": 0.6, "is_wildcard": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Circuit breaker rule configured	{"name": "api_general_circuit", "pattern": "/api/*", "priority": 3, "is_pattern": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Circuit breaker configured	{"name": "api_general_circuit", "resource": "/api/*", "strategy": "ErrorRatio", "threshold": 0.8, "is_wildcard": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Circuit breaker rule configured	{"name": "grpc_user_service_circuit", "pattern": "/grpc/user_service/*", "priority": 2, "is_pattern": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Circuit breaker configured	{"name": "grpc_user_service_circuit", "resource": "/grpc/user_service/*", "strategy": "SlowRequestRatio", "threshold": 0.3, "is_wildcard": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Circuit breaker rule configured	{"name": "grpc_write_operations_circuit", "pattern": "/grpc/*/create*,/grpc/*/update*,/grpc/*/delete*", "priority": 4, "is_pattern": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Circuit breaker configured	{"name": "grpc_write_operations_circuit", "resource": "/grpc/*/create*,/grpc/*/update*,/grpc/*/delete*", "strategy": "ErrorRatio", "threshold": 0.3, "is_wildcard": true}
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Sentinel protection middleware initialized	{"flow_rules": 8, "circuit_breakers": 5}
+✅ Protection initialized
+2025-06-21T21:07:33.643+0800	info	logger/logger.go:93	Initializing RabbitMQ connection	{"host": "localhost", "port": 5672, "vhost": "/"}
+2025-06-21T21:07:33.654+0800	info	logger/logger.go:93	Successfully connected to RabbitMQ	{"host": "localhost", "port": 5672, "vhost": "/"}
+✅ Message Queue initialized
+2025-06-21T21:07:33.654+0800	info	logger/logger.go:93	Initializing Consul client	{"host": "localhost", "port": 8500}
+2025-06-21T21:07:33.660+0800	info	logger/logger.go:93	Successfully connected to Consul	{"address": "localhost:8500"}
+✅ Service Registry initialized
+2025-06-21T21:07:33.660+0800	info	logger/logger.go:93	gRPC server created	{"port": 9093, "health_check_enabled": true, "reflection_enabled": true, "interceptors_count": 2}
+✅ gRPC Server initialized
+✅ All components initialized
+✅ HTTP transport configured
+2025/06/21 21:07:33 🔧 初始化HTTP服务...
+🚀 Starting components...
+2025-06-21T21:07:33.660+0800	info	logger/logger.go:93	Starting gRPC server	{"address": "[::]:9093", "port": 9093}

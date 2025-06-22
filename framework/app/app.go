@@ -172,7 +172,7 @@ func (a *App) Run() error {
 	}
 
 	log := logger.GetLogger()
-	log.Info("🚀 Application started",
+	log.Info(a.ctx, "🚀 Application started",
 		logger.String("name", a.opts.Name),
 		logger.String("version", a.opts.Version),
 		logger.Int("port", a.opts.Port),
@@ -185,7 +185,6 @@ func (a *App) Run() error {
 // Stop 停止应用
 func (a *App) Stop() error {
 	log := logger.GetLogger()
-	log.Info("🛑 Shutting down server...")
 
 	// 创建超时上下文
 	ctx, cancel := context.WithTimeout(context.Background(), a.opts.ShutdownTimeout)
@@ -194,35 +193,35 @@ func (a *App) Stop() error {
 	// 执行停止前回调
 	for _, fn := range a.beforeStop {
 		if err := fn(ctx); err != nil {
-			log.Error("Before stop callback failed", logger.Any("error", err))
+			log.Error(ctx, "Before stop callback failed", logger.Err(err))
 		}
 	}
 
 	// 停止传输层
 	for _, transport := range a.transports {
 		if err := transport.Stop(ctx); err != nil {
-			log.Error("Transport stop failed", logger.Any("error", err))
+			log.Error(ctx, "Transport stop failed", logger.Err(err))
 		}
 	}
 
 	// 停止组件
 	for i := len(a.components) - 1; i >= 0; i-- {
 		if err := a.components[i].Stop(ctx); err != nil {
-			log.Error("Component stop failed",
+			log.Error(ctx, "Component stop failed",
 				logger.String("component", a.components[i].Name()),
-				logger.Any("error", err))
+				logger.Err(err))
 		}
 	}
 
 	// 执行停止后回调
 	for _, fn := range a.afterStop {
 		if err := fn(ctx); err != nil {
-			log.Error("After stop callback failed", logger.Any("error", err))
+			log.Error(ctx, "After stop callback failed", logger.Err(err))
 		}
 	}
 
 	a.cancel()
-	log.Info("✅ Server stopped gracefully")
+	log.Info(ctx, "✅ Server stopped gracefully")
 	return nil
 }
 

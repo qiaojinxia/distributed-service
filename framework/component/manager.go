@@ -20,6 +20,13 @@ import (
 	"google.golang.org/grpc"
 )
 
+// ================================
+// 🚀 传输层包装器
+// ================================
+
+// GRPCHandler gRPC服务处理器
+type GRPCHandler func(interface{})
+
 // Manager  组件管理器 - 统一管理所有组件的生命周期
 type Manager struct {
 	// 核心组件
@@ -33,6 +40,9 @@ type Manager struct {
 
 	// 监控和追踪
 	tracing *tracing.Manager
+
+	// gRPC处理器
+	grpcHandlers []GRPCHandler
 
 	// 组件配置
 	opts *Options
@@ -117,6 +127,11 @@ func NewManager(opts ...Option) *Manager {
 	return &Manager{
 		opts: options,
 	}
+}
+
+// SetGRPCHandlers 设置 gRPC 处理器
+func (m *Manager) SetGRPCHandlers(handlers []GRPCHandler) {
+	m.grpcHandlers = handlers
 }
 
 // ================================
@@ -302,8 +317,7 @@ func (m *Manager) Init(ctx context.Context) error {
 		return nil
 	}
 
-	log := logger.GetLogger()
-	log.Info("🔧 Initializing components...")
+	logger.Info(ctx, "🔧 Initializing components...")
 
 	// 1. 初始化配置
 	if m.opts.EnableConfig {
@@ -418,7 +432,7 @@ func (m *Manager) Init(ctx context.Context) error {
 	}
 
 	m.initialized = true
-	log.Info("✅ All components initialized")
+	logger.Info(ctx, "✅ All components initialized")
 	return nil
 }
 
@@ -432,18 +446,29 @@ func (m *Manager) Start(ctx context.Context) error {
 		return nil
 	}
 
-	log := logger.GetLogger()
-	log.Info("🚀 Starting components...")
+	logger.Info(ctx, "🚀 Starting components...")
 
 	// 启动各个组件
 	if m.grpcServer != nil {
+		// 在启动 gRPC 服务器之前注册用户提供的服务
+		if len(m.grpcHandlers) > 0 {
+			logger.Info(ctx, "🔌 Registering gRPC services...", logger.Int("handler_count", len(m.grpcHandlers)))
+			for i, handler := range m.grpcHandlers {
+				logger.Info(ctx, "  📝 Calling gRPC handler", logger.Int("handler_index", i+1))
+				handler(m.grpcServer)
+			}
+			logger.Info(ctx, "✅ All gRPC services registered")
+		} else {
+			logger.Warn(ctx, "⚠️ No gRPC handlers found - no services will be registered")
+		}
+
 		if err := m.grpcServer.Start(ctx); err != nil {
 			return fmt.Errorf("failed to start grpc server: %w", err)
 		}
 	}
 
 	m.started = true
-	log.Info("✅ All components started")
+	logger.Info(ctx, "✅ All components started")
 	return nil
 }
 
@@ -453,24 +478,23 @@ func (m *Manager) Stop(ctx context.Context) error {
 		return nil
 	}
 
-	log := logger.GetLogger()
-	log.Info("🛑 Stopping components...")
+	logger.Info(ctx, "🛑 Stopping components...")
 
 	// 停止各个组件
 	if m.grpcServer != nil {
 		if err := m.grpcServer.Stop(ctx); err != nil {
-			log.Error("Failed to stop grpc server", logger.Any("error", err))
+			logger.Error(ctx, "Failed to stop grpc server", logger.Err(err))
 		}
 	}
 
 	if m.tracing != nil {
 		if err := m.tracing.Shutdown(ctx); err != nil {
-			log.Error("Failed to stop tracing", logger.Any("error", err))
+			logger.Error(ctx, "Failed to stop tracing", logger.Err(err))
 		}
 	}
 
 	m.started = false
-	log.Info("✅ All components stopped")
+	logger.Info(ctx, "✅ All components stopped")
 	return nil
 }
 
@@ -484,8 +508,8 @@ func (m *Manager) initConfig(ctx context.Context) error {
 		return fmt.Errorf("load config failed: %w", err)
 	}
 	m.config = &config.GlobalConfig
-	log := logger.GetLogger()
-	log.Info("✅ Config loaded")
+
+	logger.Info(ctx, "✅ Config loaded")
 	return nil
 }
 
@@ -512,9 +536,12 @@ func (m *Manager) initLogger(ctx context.Context) error {
 		}
 	}
 
-	logger.InitLogger(cfg)
-	log := logger.GetLogger()
-	log.Info("✅ Logger initialized")
+	err := logger.InitLogger(cfg)
+	if err != nil {
+		return err
+	}
+
+	logger.Info(ctx, "✅ Logger initialized")
 	return nil
 }
 
@@ -532,8 +559,7 @@ func (m *Manager) initDatabase(ctx context.Context) error {
 	if err := database.InitMySQL(ctx, cfg); err != nil {
 		return err
 	}
-	log := logger.GetLogger()
-	log.Info("✅ Database initialized")
+	logger.Info(ctx, "✅ Database initialized")
 	return nil
 }
 
@@ -551,8 +577,8 @@ func (m *Manager) initRedis(ctx context.Context) error {
 	if err := database.InitRedis(ctx, cfg); err != nil {
 		return err
 	}
-	log := logger.GetLogger()
-	log.Info("✅ Redis initialized")
+
+	logger.Info(ctx, "✅ Redis initialized")
 	return nil
 }
 
@@ -575,8 +601,8 @@ func (m *Manager) initRedisCluster(ctx context.Context) error {
 	if err := redis_cluster.InitRedisCluster(ctx, clusterCfg); err != nil {
 		return err
 	}
-	log := logger.GetLogger()
-	log.Info("✅ Redis Cluster initialized")
+
+	logger.Info(ctx, "✅ Redis Cluster initialized")
 	return nil
 }
 
@@ -595,8 +621,8 @@ func (m *Manager) initAuth(ctx context.Context) error {
 	}
 
 	m.auth = auth.NewJWTManager(secretKey, issuer)
-	log := logger.GetLogger()
-	log.Info("✅ Auth initialized")
+
+	logger.Info(ctx, "✅ Auth initialized")
 	return nil
 }
 
@@ -639,16 +665,16 @@ func (m *Manager) initTracing(ctx context.Context) error {
 		return err
 	}
 	m.tracing = tracingManager
-	log := logger.GetLogger()
-	log.Info("✅ Tracing initialized")
+
+	logger.Info(ctx, "✅ Tracing initialized")
 	return nil
 }
 
 // initMetrics 初始化监控指标
 func (m *Manager) initMetrics(ctx context.Context) error {
 	// 监控指标通常在框架级别自动初始化
-	log := logger.GetLogger()
-	log.Info("✅ Metrics initialized")
+
+	logger.Info(ctx, "✅ Metrics initialized")
 	return nil
 }
 
@@ -668,8 +694,8 @@ func (m *Manager) initProtection(ctx context.Context) error {
 		return err
 	}
 	m.protection = protectionMiddleware
-	log := logger.GetLogger()
-	log.Info("✅ Protection initialized")
+
+	logger.Info(ctx, "✅ Protection initialized")
 	return nil
 }
 
@@ -687,8 +713,8 @@ func (m *Manager) initMQ(ctx context.Context) error {
 	if err := mq.InitRabbitMQ(ctx, cfg); err != nil {
 		return err
 	}
-	log := logger.GetLogger()
-	log.Info("✅ Message Queue initialized")
+
+	logger.Info(ctx, "✅ Message Queue initialized")
 	return nil
 }
 
@@ -708,8 +734,8 @@ func (m *Manager) initRegistry(ctx context.Context) error {
 		return err
 	}
 	m.registry = registryInstance
-	log := logger.GetLogger()
-	log.Info("✅ Service Registry initialized")
+
+	logger.Info(ctx, "✅ Service Registry initialized")
 	return nil
 }
 
@@ -772,8 +798,8 @@ func (m *Manager) initGRPCServer(ctx context.Context) error {
 		return err
 	}
 	m.grpcServer = grpcSrv
-	log := logger.GetLogger()
-	log.Info("✅ gRPC Server initialized")
+
+	logger.Info(ctx, "✅ gRPC Server initialized")
 	return nil
 }
 
@@ -790,8 +816,8 @@ func (m *Manager) initElasticsearch(ctx context.Context) error {
 
 	// 这里可以初始化Elasticsearch
 	_ = cfg // 暂时忽略配置
-	log := logger.GetLogger()
-	log.Info("✅ Elasticsearch initialized")
+
+	logger.Info(ctx, "✅ Elasticsearch initialized")
 	return nil
 }
 
@@ -814,8 +840,8 @@ func (m *Manager) initKafka(ctx context.Context) error {
 	if err := kafka.InitKafka(ctx, kafkaCfg); err != nil {
 		return err
 	}
-	log := logger.GetLogger()
-	log.Info("✅ Kafka initialized")
+
+	logger.Info(ctx, "✅ Kafka initialized")
 	return nil
 }
 
@@ -832,8 +858,8 @@ func (m *Manager) initMongoDB(ctx context.Context) error {
 
 	// 这里可以初始化MongoDB
 	_ = cfg // 暂时忽略配置
-	log := logger.GetLogger()
-	log.Info("✅ MongoDB initialized")
+
+	logger.Info(ctx, "✅ MongoDB initialized")
 	return nil
 }
 
@@ -856,8 +882,8 @@ func (m *Manager) initEtcd(ctx context.Context) error {
 	if err := etcd.InitEtcd(ctx, etcdCfg); err != nil {
 		return err
 	}
-	log := logger.GetLogger()
-	log.Info("✅ Etcd initialized")
+
+	logger.Info(ctx, "✅ Etcd initialized")
 	return nil
 }
 

@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/qiaojinxia/distributed-service/framework/config"
-	"github.com/qiaojinxia/distributed-service/framework/logger"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/framework/logger"
 )
 
 // Client Elasticsearch客户端
@@ -219,7 +220,7 @@ func (c *Client) DeleteIndex(ctx context.Context, index string) error {
 // Close 关闭客户端
 func (c *Client) Close() error {
 	// Elasticsearch客户端不需要显式关闭
-	c.logger.Info("Elasticsearch client closed")
+	c.logger.Info(context.Background(), "Elasticsearch client closed")
 	return nil
 }
 
@@ -250,7 +251,7 @@ func InitElasticsearch(ctx context.Context, cfg *Config) error {
 	}
 
 	globalClient = client
-	logger.GetLogger().Info("Elasticsearch client initialized successfully")
+	logger.GetLogger().With(logger.String("Elasticsearch", "")).Info(context.Background(), "Elasticsearch client initialized successfully")
 	return nil
 }
 

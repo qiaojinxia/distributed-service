@@ -288,12 +288,11 @@ func (c *Client) ForEachMaster(ctx context.Context, fn func(ctx context.Context,
 
 // Close 关闭连接
 func (c *Client) Close() error {
-	err := c.client.Close()
-	if err != nil {
-		c.logger.Errorf("Redis cluster close failed: %v", err)
-		return err
+	if err := c.client.Close(); err != nil {
+		c.logger.Errorf(context.Background(), "Redis cluster close failed: %v", err)
+	} else {
+		c.logger.Info(context.Background(), "Redis cluster client closed successfully")
 	}
-	c.logger.Info("Redis cluster client closed")
 	return nil
 }
 
@@ -340,7 +339,7 @@ func InitRedisCluster(ctx context.Context, cfg *Config) error {
 	}
 
 	globalClient = client
-	logger.GetLogger().Info("Redis Cluster client initialized successfully")
+	logger.GetLogger().Info(context.Background(), "Redis cluster initialized successfully")
 	return nil
 }
 
