@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/qiaojinxia/distributed-service/framework/auth"
+	"github.com/qiaojinxia/distributed-service/framework/cache"
+	"github.com/qiaojinxia/distributed-service/framework/common/idgen"
 	"github.com/qiaojinxia/distributed-service/framework/config"
 	"github.com/qiaojinxia/distributed-service/framework/database"
 	"github.com/qiaojinxia/distributed-service/framework/logger"
@@ -27,6 +29,15 @@ import (
 // GRPCHandler gRPC服务处理器
 type GRPCHandler func(interface{})
 
+// IDGenService ID生成器服务接口
+type IDGenService interface {
+	Initialize(ctx context.Context) error
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+	NextID(ctx context.Context, bizTag string) (int64, error)
+	BatchNextID(ctx context.Context, bizTag string, count int) ([]int64, error)
+}
+
 // Manager  组件管理器 - 统一管理所有组件的生命周期
 type Manager struct {
 	// 核心组件
@@ -40,6 +51,12 @@ type Manager struct {
 
 	// 监控和追踪
 	tracing *tracing.Manager
+
+	// 缓存管理器
+	cacheService *cache.FrameworkCacheService
+
+	// ID生成器
+	idGenService IDGenService
 
 	// gRPC处理器
 	grpcHandlers []GRPCHandler
@@ -74,6 +91,8 @@ type Options struct {
 	EnableKafka         bool
 	EnableMongoDB       bool
 	EnableEtcd          bool
+	EnableCache         bool
+	EnableIDGen         bool
 
 	// 组件配置
 	DatabaseConfig      *config.MySQLConfig
@@ -91,6 +110,8 @@ type Options struct {
 	KafkaConfig         *config.KafkaConfig
 	MongoDBConfig       *config.MongoDBConfig
 	EtcdConfig          *config.EtcdConfig
+	CacheConfig         *config.CacheConfig
+	IDGenConfig         *config.IDGenConfig
 }
 
 // Option 组件配置选项函数
@@ -117,6 +138,8 @@ func NewManager(opts ...Option) *Manager {
 		EnableKafka:         false, // 默认禁用，按需启用
 		EnableMongoDB:       false, // 默认禁用，按需启用
 		EnableEtcd:          false, // 默认禁用，按需启用
+		EnableCache:         true,  // 默认启用缓存
+		EnableIDGen:         false, // 默认禁用，按需启用
 	}
 
 	// 应用选项
@@ -265,6 +288,22 @@ func WithEtcd(cfg *config.EtcdConfig) Option {
 	}
 }
 
+// WithCache 缓存配置
+func WithCache(cfg *config.CacheConfig) Option {
+	return func(o *Options) {
+		o.CacheConfig = cfg
+		o.EnableCache = true
+	}
+}
+
+// WithIDGen ID生成器配置
+func WithIDGen(cfg *config.IDGenConfig) Option {
+	return func(o *Options) {
+		o.IDGenConfig = cfg
+		o.EnableIDGen = true
+	}
+}
+
 // DisableComponent 禁用指定组件
 func DisableComponent(components ...string) Option {
 	return func(o *Options) {
@@ -302,6 +341,10 @@ func DisableComponent(components ...string) Option {
 				o.EnableMongoDB = false
 			case "etcd":
 				o.EnableEtcd = false
+			case "cache":
+				o.EnableCache = false
+			case "idgen":
+				o.EnableIDGen = false
 			}
 		}
 	}
@@ -431,6 +474,20 @@ func (m *Manager) Init(ctx context.Context) error {
 		}
 	}
 
+	// 17. 初始化缓存
+	if m.opts.EnableCache {
+		if err := m.initCache(ctx); err != nil {
+			return fmt.Errorf("failed to init cache: %w", err)
+		}
+	}
+
+	// 18. 初始化ID生成器
+	if m.opts.EnableIDGen {
+		if err := m.initIDGen(ctx); err != nil {
+			return fmt.Errorf("failed to init idgen: %w", err)
+		}
+	}
+
 	m.initialized = true
 	logger.Info(ctx, "✅ All components initialized")
 	return nil
@@ -467,6 +524,13 @@ func (m *Manager) Start(ctx context.Context) error {
 		}
 	}
 
+	// 启动ID生成器
+	if m.idGenService != nil {
+		if err := m.idGenService.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start idgen service: %w", err)
+		}
+	}
+
 	m.started = true
 	logger.Info(ctx, "✅ All components started")
 	return nil
@@ -490,6 +554,18 @@ func (m *Manager) Stop(ctx context.Context) error {
 	if m.tracing != nil {
 		if err := m.tracing.Shutdown(ctx); err != nil {
 			logger.Error(ctx, "Failed to stop tracing", logger.Err(err))
+		}
+	}
+
+	if m.cacheService != nil {
+		if err := m.cacheService.Close(); err != nil {
+			logger.Error(ctx, "Failed to stop cache service", logger.Err(err))
+		}
+	}
+
+	if m.idGenService != nil {
+		if err := m.idGenService.Stop(ctx); err != nil {
+			logger.Error(ctx, "Failed to stop idgen service", logger.Err(err))
 		}
 	}
 
@@ -887,6 +963,128 @@ func (m *Manager) initEtcd(ctx context.Context) error {
 	return nil
 }
 
+// initCache 初始化缓存
+func (m *Manager) initCache(ctx context.Context) error {
+	// 初始化缓存服务
+	m.cacheService = cache.NewFrameworkCacheService()
+
+	// 初始化缓存服务
+	if err := m.cacheService.Initialize(ctx); err != nil {
+		return fmt.Errorf("failed to initialize cache service: %w", err)
+	}
+
+	// 如果有配置，创建预定义的缓存实例
+	var cacheConfig *config.CacheConfig
+	if m.opts.CacheConfig != nil {
+		cacheConfig = m.opts.CacheConfig
+	} else if m.config != nil {
+		cacheConfig = &m.config.Cache
+	}
+
+	if cacheConfig != nil && cacheConfig.Enabled {
+		// 根据配置创建缓存实例
+		for name, instanceCfg := range cacheConfig.Caches {
+			if err := m.createCacheFromConfig(name, instanceCfg, cacheConfig); err != nil {
+				logger.Error(ctx, "Failed to create cache instance", 
+					logger.String("name", name), 
+					logger.Err(err))
+				continue
+			}
+			logger.Info(ctx, "✅ Cache instance created", 
+				logger.String("name", name), 
+				logger.String("type", instanceCfg.Type))
+		}
+	}
+
+	logger.Info(ctx, "✅ Cache initialized")
+	return nil
+}
+
+// createCacheFromConfig 根据配置创建缓存实例
+func (m *Manager) createCacheFromConfig(name string, instanceCfg config.CacheInstance, globalCfg *config.CacheConfig) error {
+	keyPrefix := instanceCfg.KeyPrefix
+	if keyPrefix == "" && globalCfg.GlobalKeyPrefix != "" {
+		keyPrefix = globalCfg.GlobalKeyPrefix + ":" + name
+	}
+
+	switch instanceCfg.Type {
+	case "memory":
+		// 创建内存缓存配置
+		memoryConfig := cache.Config{
+			Type: cache.TypeMemory,
+			Name: name,
+			Settings: instanceCfg.Settings,
+		}
+		
+		// 确保有默认TTL
+		if memoryConfig.Settings == nil {
+			memoryConfig.Settings = make(map[string]interface{})
+		}
+		if _, exists := memoryConfig.Settings["default_ttl"]; !exists && instanceCfg.TTL != "" {
+			memoryConfig.Settings["default_ttl"] = instanceCfg.TTL
+		}
+		
+		return m.cacheService.Manager.CreateCache(memoryConfig)
+
+	case "redis":
+		// 创建Redis缓存
+		return m.cacheService.CreateRedisCache(name, keyPrefix)
+
+	case "hybrid":
+		// 创建混合缓存
+		l1Config := cache.Config{
+			Type: cache.TypeMemory,
+			Name: "l1-" + name,
+			Settings: map[string]interface{}{
+				"max_size":    1000,
+				"default_ttl": "5m",
+			},
+		}
+		return m.cacheService.CreateHybridCache(name, l1Config, keyPrefix, cache.SyncStrategyWriteThrough)
+
+	default:
+		return fmt.Errorf("unsupported cache type: %s", instanceCfg.Type)
+	}
+}
+
+// initIDGen 初始化ID生成器
+func (m *Manager) initIDGen(ctx context.Context) error {
+	logger.Info(ctx, "🆔 Initializing ID generator...")
+
+	// 优先使用选项配置
+	var idGenCfg *config.IDGenConfig
+	if m.opts.IDGenConfig != nil {
+		idGenCfg = m.opts.IDGenConfig
+	} else if m.config != nil {
+		idGenCfg = &m.config.IDGen
+	} else {
+		// 使用默认配置
+		idGenCfg = &config.IDGenConfig{
+			Enabled:      true,
+			Type:         "leaf",
+			UseFramework: true,
+			DefaultStep:  1000,
+		}
+	}
+
+	// 检查是否启用
+	if !idGenCfg.Enabled {
+		logger.Info(ctx, "ID generator is disabled, skipping initialization")
+		return nil
+	}
+
+	// 创建框架ID生成器服务
+	m.idGenService = idgen.NewFrameworkIDGenService()
+
+	// 初始化服务
+	if err := m.idGenService.Initialize(ctx); err != nil {
+		return fmt.Errorf("failed to initialize ID generator service: %w", err)
+	}
+
+	logger.Info(ctx, "✅ ID generator initialized")
+	return nil
+}
+
 // ================================
 // 🔍 组件访问器
 // ================================
@@ -919,6 +1117,16 @@ func (m *Manager) GetProtection() *middleware.SentinelProtectionMiddleware {
 // GetTracing 获取链路追踪
 func (m *Manager) GetTracing() *tracing.Manager {
 	return m.tracing
+}
+
+// GetCacheService 获取缓存服务
+func (m *Manager) GetCacheService() *cache.FrameworkCacheService {
+	return m.cacheService
+}
+
+// GetIDGenService 获取ID生成器服务
+func (m *Manager) GetIDGenService() IDGenService {
+	return m.idGenService
 }
 
 // IsInitialized 检查是否已初始化

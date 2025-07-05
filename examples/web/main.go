@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"github.com/qiaojinxia/distributed-service/framework"
+	"github.com/qiaojinxia/distributed-service/framework/core"
 	"log"
 )
 
@@ -10,7 +10,7 @@ func main() {
 	log.Println("🌐 启动Web应用示例...")
 
 	// 链式配置启动Web服务
-	err := framework.New().
+	err := core.New().
 		Port(8080).                                  // 设置端口
 		Mode("debug").                               // 开发模式
 		Name("web-demo").                            // 应用名称

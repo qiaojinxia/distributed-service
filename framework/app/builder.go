@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/qiaojinxia/distributed-service/framework/cache"
 	"github.com/qiaojinxia/distributed-service/framework/component"
 	"github.com/qiaojinxia/distributed-service/framework/config"
 	"github.com/qiaojinxia/distributed-service/framework/logger"
@@ -107,12 +108,28 @@ func (b *Builder) Version(version string) *Builder {
 	return b
 }
 
-// Config 设置配置文件路径
+// Config 设置配置文件路径（自动启用缓存配置）
 func (b *Builder) Config(path string) *Builder {
 	b.app.opts.ConfigPath = path
 	// 同时设置组件管理器的配置路径
 	b.componentManager = component.NewManager(component.WithConfig(path))
+	// 自动加载组件配置（如果配置文件中启用了相关组件）
+	b.tryEnableComponentsFromConfig()
 	return b
+}
+
+// tryEnableComponentsFromConfig 尝试从配置文件启用组件
+func (b *Builder) tryEnableComponentsFromConfig() {
+	if b.app.opts.ConfigPath != "" {
+		if err := config.LoadConfig(b.app.opts.ConfigPath); err == nil {
+			if config.GlobalConfig.Cache.Enabled {
+				b.WithCacheFromConfig()
+			}
+			if config.GlobalConfig.IDGen.Enabled {
+				b.WithIDGenFromConfig()
+			}
+		}
+	}
 }
 
 // ================================
@@ -207,6 +224,288 @@ func (b *Builder) WithMongoDB(cfg *config.MongoDBConfig) *Builder {
 func (b *Builder) WithEtcd(cfg *config.EtcdConfig) *Builder {
 	b.componentManager = component.NewManager(component.WithEtcd(cfg))
 	return b
+}
+
+// WithCache 配置缓存组件
+func (b *Builder) WithCache(cfg *config.CacheConfig) *Builder {
+	b.componentManager = component.NewManager(component.WithCache(cfg))
+	return b
+}
+
+// WithIDGen 配置ID生成器组件
+func (b *Builder) WithIDGen(cfg *config.IDGenConfig) *Builder {
+	b.componentManager = component.NewManager(component.WithIDGen(cfg))
+	return b
+}
+
+// WithCacheDefaults 使用默认缓存配置（自动从框架配置读取）
+func (b *Builder) WithCacheDefaults() *Builder {
+	// 如果已有配置文件，优先使用配置文件中的cache配置
+	if b.app.opts.ConfigPath != "" {
+		return b.WithCacheFromConfig()
+	}
+	
+	// 否则使用硬编码默认配置
+	cacheConfig := &config.CacheConfig{
+		Enabled:         true,
+		DefaultType:     "redis",
+		UseFramework:    true,
+		GlobalKeyPrefix: "app",
+		DefaultTTL:      "1h",
+		Caches: map[string]config.CacheInstance{
+			"users": {
+				Type:      "redis",
+				KeyPrefix: "users",
+				TTL:       "2h",
+			},
+			"sessions": {
+				Type:      "memory",
+				KeyPrefix: "sessions",
+				TTL:       "30m",
+				Settings: map[string]interface{}{
+					"max_size": 5000,
+				},
+			},
+		},
+	}
+	return b.WithCache(cacheConfig)
+}
+
+// WithMemoryCache 使用纯内存缓存（可选覆盖框架配置）
+func (b *Builder) WithMemoryCache() *Builder {
+	// 如果有配置文件，尝试读取框架配置并覆盖缓存类型
+	if b.app.opts.ConfigPath != "" {
+		if err := config.LoadConfig(b.app.opts.ConfigPath); err == nil {
+			// 使用框架配置，但强制改为内存缓存
+			frameworkCacheConfig := config.GlobalConfig.Cache
+			frameworkCacheConfig.DefaultType = "memory"
+			frameworkCacheConfig.UseFramework = false
+			// 覆盖所有缓存实例为内存缓存
+			for name, instance := range frameworkCacheConfig.Caches {
+				instance.Type = "memory"
+				if instance.Settings == nil {
+					instance.Settings = make(map[string]interface{})
+				}
+				if _, exists := instance.Settings["max_size"]; !exists {
+					instance.Settings["max_size"] = 10000
+				}
+				frameworkCacheConfig.Caches[name] = instance
+			}
+			return b.WithCache(&frameworkCacheConfig)
+		}
+	}
+	
+	// 回退到硬编码配置
+	cacheConfig := &config.CacheConfig{
+		Enabled:         true,
+		DefaultType:     "memory",
+		UseFramework:    false,
+		GlobalKeyPrefix: "app",
+		DefaultTTL:      "1h",
+		Caches: map[string]config.CacheInstance{
+			"default": {
+				Type:      "memory",
+				KeyPrefix: "default",
+				TTL:       "1h",
+				Settings: map[string]interface{}{
+					"max_size": 10000,
+				},
+			},
+		},
+	}
+	return b.WithCache(cacheConfig)
+}
+
+// WithRedisCache 使用Redis缓存（自动使用框架Redis配置）
+func (b *Builder) WithRedisCache() *Builder {
+	// 如果有配置文件，尝试读取框架配置并覆盖缓存类型
+	if b.app.opts.ConfigPath != "" {
+		if err := config.LoadConfig(b.app.opts.ConfigPath); err == nil {
+			// 使用框架配置，但强制改为Redis缓存
+			frameworkCacheConfig := config.GlobalConfig.Cache
+			frameworkCacheConfig.DefaultType = "redis"
+			frameworkCacheConfig.UseFramework = true
+			// 覆盖所有缓存实例为Redis缓存
+			for name, instance := range frameworkCacheConfig.Caches {
+				instance.Type = "redis"
+				frameworkCacheConfig.Caches[name] = instance
+			}
+			return b.WithCache(&frameworkCacheConfig)
+		}
+	}
+	
+	// 回退到硬编码配置
+	cacheConfig := &config.CacheConfig{
+		Enabled:         true,
+		DefaultType:     "redis",
+		UseFramework:    true,
+		GlobalKeyPrefix: "app",
+		DefaultTTL:      "2h",
+		Caches: map[string]config.CacheInstance{
+			"default": {
+				Type:      "redis",
+				KeyPrefix: "default",
+				TTL:       "2h",
+			},
+		},
+	}
+	return b.WithCache(cacheConfig)
+}
+
+// WithHybridCache 使用混合缓存（内存+Redis，自动使用框架配置）
+func (b *Builder) WithHybridCache() *Builder {
+	// 如果有配置文件，尝试读取框架配置并覆盖缓存类型
+	if b.app.opts.ConfigPath != "" {
+		if err := config.LoadConfig(b.app.opts.ConfigPath); err == nil {
+			// 使用框架配置，但强制改为混合缓存
+			frameworkCacheConfig := config.GlobalConfig.Cache
+			frameworkCacheConfig.DefaultType = "hybrid"
+			frameworkCacheConfig.UseFramework = true
+			// 覆盖所有缓存实例为混合缓存
+			for name, instance := range frameworkCacheConfig.Caches {
+				instance.Type = "hybrid"
+				frameworkCacheConfig.Caches[name] = instance
+			}
+			return b.WithCache(&frameworkCacheConfig)
+		}
+	}
+	
+	// 回退到硬编码配置
+	cacheConfig := &config.CacheConfig{
+		Enabled:         true,
+		DefaultType:     "hybrid",
+		UseFramework:    true,
+		GlobalKeyPrefix: "app",
+		DefaultTTL:      "1h",
+		Caches: map[string]config.CacheInstance{
+			"default": {
+				Type:      "hybrid",
+				KeyPrefix: "default",
+				TTL:       "1h",
+			},
+		},
+	}
+	return b.WithCache(cacheConfig)
+}
+
+// WithCacheFromConfig 直接从配置文件读取缓存配置
+func (b *Builder) WithCacheFromConfig() *Builder {
+	if b.app.opts.ConfigPath != "" {
+		if err := config.LoadConfig(b.app.opts.ConfigPath); err == nil {
+			// 使用配置文件中的缓存配置
+			if config.GlobalConfig.Cache.Enabled {
+				return b.WithCache(&config.GlobalConfig.Cache)
+			}
+		}
+	}
+	// 如果配置文件中没有缓存配置或读取失败，使用默认配置
+	return b.WithCacheDefaults()
+}
+
+// WithCacheAuto 智能缓存配置（自动检测最佳配置）
+func (b *Builder) WithCacheAuto() *Builder {
+	// 优先使用配置文件
+	if b.app.opts.ConfigPath != "" {
+		return b.WithCacheFromConfig()
+	}
+	// 根据应用模式智能选择策略
+	return b.WithCacheSmartDefaults()
+}
+
+// WithCacheSmartDefaults 智能默认缓存配置（根据应用特征选择）
+func (b *Builder) WithCacheSmartDefaults() *Builder {
+	// 导入cache包来使用智能默认配置
+	// 根据应用模式和名称推荐配置
+	appType := "webapp" // 默认为web应用
+	if b.app.opts.Name != "" {
+		// 根据应用名称推断类型
+		name := strings.ToLower(b.app.opts.Name)
+		if strings.Contains(name, "api") || strings.Contains(name, "backend") {
+			appType = "api"
+		} else if strings.Contains(name, "microservice") || strings.Contains(name, "ms") {
+			appType = "microservice"
+		}
+	}
+	
+	// 使用智能推荐策略
+	recommendedConfig := getRecommendedCacheStrategy(appType, b.app.opts.Mode)
+	return b.WithCache(recommendedConfig)
+}
+
+// WithCacheForWebApp 为Web应用优化的缓存配置
+func (b *Builder) WithCacheForWebApp() *Builder {
+	webAppConfig := getWebAppCacheDefaults()
+	return b.WithCache(webAppConfig)
+}
+
+// WithCacheForAPI 为API服务优化的缓存配置
+func (b *Builder) WithCacheForAPI() *Builder {
+	apiConfig := getAPICacheDefaults()
+	return b.WithCache(apiConfig)
+}
+
+// WithCacheForMicroservice 为微服务优化的缓存配置
+func (b *Builder) WithCacheForMicroservice() *Builder {
+	msConfig := getMicroserviceCacheDefaults()
+	return b.WithCache(msConfig)
+}
+
+// WithCacheForDevelopment 为开发环境优化的缓存配置
+func (b *Builder) WithCacheForDevelopment() *Builder {
+	devConfig := getDevelopmentCacheDefaults()
+	return b.WithCache(devConfig)
+}
+
+// WithIDGenDefaults 使用默认ID生成器配置（自动从框架配置读取）
+func (b *Builder) WithIDGenDefaults() *Builder {
+	// 如果有配置文件，尝试从配置文件读取
+	if b.app.opts.ConfigPath != "" {
+		if err := config.LoadConfig(b.app.opts.ConfigPath); err == nil {
+			if config.GlobalConfig.IDGen.Enabled {
+				return b.WithIDGen(&config.GlobalConfig.IDGen)
+			}
+		}
+	}
+	
+	// 回退到硬编码默认配置
+	idGenConfig := &config.IDGenConfig{
+		Enabled:      true,
+		Type:         "leaf",
+		UseFramework: true,
+		DefaultStep:  1000,
+		Leaf: config.IDGenLeafConfig{
+			DefaultStep:      1000,
+			PreloadThreshold: "0.9",
+			CleanupInterval:  "1h",
+			MaxStepSize:      100000,
+			MinStepSize:      100,
+			StepAdjustRatio:  "2.0",
+		},
+	}
+	return b.WithIDGen(idGenConfig)
+}
+
+// WithIDGenFromConfig 直接从配置文件读取ID生成器配置
+func (b *Builder) WithIDGenFromConfig() *Builder {
+	if b.app.opts.ConfigPath != "" {
+		if err := config.LoadConfig(b.app.opts.ConfigPath); err == nil {
+			if config.GlobalConfig.IDGen.Enabled {
+				return b.WithIDGen(&config.GlobalConfig.IDGen)
+			}
+		}
+	}
+	// 如果配置文件中没有ID生成器配置或读取失败，使用默认配置
+	return b.WithIDGenDefaults()
+}
+
+// WithIDGenAuto 智能ID生成器配置（自动检测最佳配置）
+func (b *Builder) WithIDGenAuto() *Builder {
+	// 优先使用配置文件
+	if b.app.opts.ConfigPath != "" {
+		return b.WithIDGenFromConfig()
+	}
+	// 回退到默认配置
+	return b.WithIDGenDefaults()
 }
 
 // DisableComponents 禁用指定组件
@@ -330,6 +629,8 @@ func (b *Builder) Enable(components ...string) *Builder {
 			b.EnableMetrics()
 		case "tracing":
 			b.EnableTracing()
+		case "cache":
+			// Cache 在组件管理器中默认启用，这里不需要特别处理
 		}
 	}
 	return b
@@ -347,6 +648,8 @@ func (b *Builder) Disable(components ...string) *Builder {
 			b.DisableMetrics()
 		case "tracing":
 			b.DisableTracing()
+		case "cache":
+			b.componentManager = component.NewManager(component.DisableComponent("cache"))
 		}
 	}
 	return b
@@ -460,6 +763,9 @@ func (b *Builder) AutoDetect() *Builder {
 	for _, file := range configFiles {
 		if file != "" && fileExists(file) {
 			b.Config(file)
+			// 自动加载组件配置
+			b.WithCacheAuto()
+			b.WithIDGenAuto()
 			break
 		}
 	}
@@ -697,26 +1003,31 @@ func getEnvBool(key string, defaultValue bool) bool {
 }
 
 // ================================
-// 🔗 组件包装器
+// 🔧 缓存配置助手函数
 // ================================
 
-// ComponentWrapper 组件管理器的包装器，实现Component接口
-type ComponentWrapper struct {
-	manager *component.Manager
+// getRecommendedCacheStrategy 获取推荐的缓存策略
+func getRecommendedCacheStrategy(appType, mode string) *config.CacheConfig {
+	return cache.GetRecommendedStrategy(appType, mode)
 }
 
-func (c *ComponentWrapper) Name() string {
-	return "ComponentManager"
+// getWebAppCacheDefaults 获取Web应用缓存默认配置
+func getWebAppCacheDefaults() *config.CacheConfig {
+	return cache.DefaultStrategies.GetWebAppDefaults()
 }
 
-func (c *ComponentWrapper) Init(ctx context.Context) error {
-	return c.manager.Init(ctx)
+// getAPICacheDefaults 获取API服务缓存默认配置
+func getAPICacheDefaults() *config.CacheConfig {
+	return cache.DefaultStrategies.GetAPIDefaults()
 }
 
-func (c *ComponentWrapper) Start(ctx context.Context) error {
-	return c.manager.Start(ctx)
+// getMicroserviceCacheDefaults 获取微服务缓存默认配置
+func getMicroserviceCacheDefaults() *config.CacheConfig {
+	return cache.DefaultStrategies.GetMicroserviceDefaults()
 }
 
-func (c *ComponentWrapper) Stop(ctx context.Context) error {
-	return c.manager.Stop(ctx)
+// getDevelopmentCacheDefaults 获取开发环境缓存默认配置
+func getDevelopmentCacheDefaults() *config.CacheConfig {
+	return cache.DefaultStrategies.GetDevelopmentDefaults()
 }
+

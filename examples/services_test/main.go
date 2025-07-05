@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"github.com/qiaojinxia/distributed-service/framework"
 	"github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/framework/core"
 	httpTransport "github.com/qiaojinxia/distributed-service/framework/transport/http"
 	"github.com/qiaojinxia/distributed-service/pkg/etcd"
 	"github.com/qiaojinxia/distributed-service/pkg/kafka"
@@ -18,7 +18,7 @@ func main() {
 	log.Println("🚀 启动新增服务测试...")
 
 	// 使用简化配置启动框架
-	err := framework.New().
+	err := core.New().
 		Port(8080).
 		Name("services-test").
 		Version("v1.0.0").

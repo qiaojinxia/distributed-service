@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"github.com/qiaojinxia/distributed-service/framework"
 	"github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/framework/core"
 	httpTransport "github.com/qiaojinxia/distributed-service/framework/transport/http"
 	"log"
 
@@ -14,7 +14,7 @@ func main() {
 	log.Println("🚀 启动高级功能框架示例...")
 
 	// 使用完整的组件配置启动框架
-	err := framework.New().
+	err := core.New().
 		Port(8080).
 		Name("advanced-demo").
 		Version("v2.0.0").

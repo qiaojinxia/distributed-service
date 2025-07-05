@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"github.com/qiaojinxia/distributed-service/framework"
+	"github.com/qiaojinxia/distributed-service/framework/core"
 	"log"
 )
 
@@ -10,7 +10,7 @@ func main() {
 	log.Println("🔌 启动微服务示例...")
 
 	// 微服务模式 - 启用gRPC、监控、链路追踪
-	err := framework.New().
+	err := core.New().
 		Port(9000).                                   // gRPC端口
 		Name("user-service").                         // 服务名称
 		Version("v1.2.0").                            // 服务版本

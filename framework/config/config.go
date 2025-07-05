@@ -23,6 +23,8 @@ type Config struct {
 	Kafka         KafkaConfig         `mapstructure:"kafka"`
 	MongoDB       MongoDBConfig       `mapstructure:"mongodb"`
 	Etcd          EtcdConfig          `mapstructure:"etcd"`
+	Cache         CacheConfig         `mapstructure:"cache"`
+	IDGen         IDGenConfig         `mapstructure:"idgen"`
 }
 
 type ServerConfig struct {
@@ -273,4 +275,111 @@ type RedisClusterConfig struct {
 	DialTimeout  int `mapstructure:"dial_timeout"`  // 连接超时(秒)
 	ReadTimeout  int `mapstructure:"read_timeout"`  // 读取超时(秒)
 	WriteTimeout int `mapstructure:"write_timeout"` // 写入超时(秒)
+}
+
+// CacheConfig 缓存配置
+type CacheConfig struct {
+	Enabled         bool                    `mapstructure:"enabled"`           // 是否启用缓存
+	DefaultType     string                  `mapstructure:"default_type"`      // 默认缓存类型 (memory, redis, hybrid)
+	UseFramework    bool                    `mapstructure:"use_framework"`     // 是否使用框架Redis
+	GlobalKeyPrefix string                  `mapstructure:"global_key_prefix"` // 全局键前缀
+	DefaultTTL      string                  `mapstructure:"default_ttl"`       // 默认过期时间
+	Caches          map[string]CacheInstance `mapstructure:"caches"`           // 预定义缓存实例
+}
+
+// CacheInstance 缓存实例配置
+type CacheInstance struct {
+	Type      string                 `mapstructure:"type"`       // 缓存类型
+	KeyPrefix string                 `mapstructure:"key_prefix"` // 键前缀
+	TTL       string                 `mapstructure:"ttl"`        // 过期时间
+	Settings  map[string]interface{} `mapstructure:"settings"`   // 自定义设置
+}
+
+// CacheMemoryConfig 内存缓存配置
+type CacheMemoryConfig struct {
+	MaxSize         int    `mapstructure:"max_size"`         // 最大条目数
+	CleanupInterval string `mapstructure:"cleanup_interval"` // 清理间隔
+	EvictionPolicy  string `mapstructure:"eviction_policy"`  // 淘汰策略 (lru, lfu, fifo, random, ttl)
+	EnableMetrics   bool   `mapstructure:"enable_metrics"`   // 启用指标收集
+	EnableCallbacks bool   `mapstructure:"enable_callbacks"` // 启用回调函数
+	ShardCount      int    `mapstructure:"shard_count"`      // 分片数量，提高并发性能
+	PreAllocSize    int    `mapstructure:"pre_alloc_size"`   // 预分配大小
+	TTLVariance     string `mapstructure:"ttl_variance"`     // TTL变化范围
+	LFUDecayRate    string `mapstructure:"lfu_decay_rate"`   // LFU衰减率
+	LFUMinFreq      int64  `mapstructure:"lfu_min_freq"`     // LFU最小频率
+}
+
+// CacheRedisConfig Redis缓存配置
+type CacheRedisConfig struct {
+	UseFramework bool   `mapstructure:"use_framework"` // 使用框架Redis
+	KeyPrefix    string `mapstructure:"key_prefix"`    // 键前缀
+	// 如果不使用框架Redis，可以单独配置
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Password string `mapstructure:"password"`
+	DB       int    `mapstructure:"db"`
+	PoolSize int    `mapstructure:"pool_size"`
+}
+
+// CacheHybridConfig 混合缓存配置
+type CacheHybridConfig struct {
+	L1Type        string                 `mapstructure:"l1_type"`        // L1缓存类型 (通常是memory)
+	L1Settings    map[string]interface{} `mapstructure:"l1_settings"`    // L1缓存设置
+	L2Type        string                 `mapstructure:"l2_type"`        // L2缓存类型 (通常是redis)
+	L2Settings    map[string]interface{} `mapstructure:"l2_settings"`    // L2缓存设置
+	SyncStrategy  string                 `mapstructure:"sync_strategy"`  // 同步策略
+	L1TTL         string                 `mapstructure:"l1_ttl"`         // L1过期时间
+	L2TTL         string                 `mapstructure:"l2_ttl"`         // L2过期时间
+	WriteBack     CacheWriteBackConfig   `mapstructure:"write_back"`     // 写回配置
+}
+
+// CacheWriteBackConfig 写回配置
+type CacheWriteBackConfig struct {
+	Enabled   bool   `mapstructure:"enabled"`    // 是否启用写回
+	Interval  string `mapstructure:"interval"`   // 写回间隔
+	BatchSize int    `mapstructure:"batch_size"` // 批次大小
+}
+
+// IDGenConfig ID生成器配置
+type IDGenConfig struct {
+	Enabled         bool                    `mapstructure:"enabled"`           // 是否启用ID生成器
+	Type            string                  `mapstructure:"type"`              // 生成器类型 (leaf, snowflake)
+	UseFramework    bool                    `mapstructure:"use_framework"`     // 是否使用框架数据库配置
+	DefaultStep     int32                   `mapstructure:"default_step"`      // 默认步长
+	Database        IDGenDatabaseConfig     `mapstructure:"database"`          // 数据库配置（不使用框架时）
+	Leaf            IDGenLeafConfig         `mapstructure:"leaf"`              // Leaf配置
+	BizTags         map[string]IDGenBizTag  `mapstructure:"biz_tags"`          // 预定义业务标识
+}
+
+// IDGenDatabaseConfig ID生成器数据库配置
+type IDGenDatabaseConfig struct {
+	Driver          string `mapstructure:"driver"`            // 数据库驱动
+	DSN             string `mapstructure:"dsn"`               // 数据源名称
+	Host            string `mapstructure:"host"`              // 主机
+	Port            int    `mapstructure:"port"`              // 端口
+	Database        string `mapstructure:"database"`          // 数据库名
+	Username        string `mapstructure:"username"`          // 用户名
+	Password        string `mapstructure:"password"`          // 密码
+	Charset         string `mapstructure:"charset"`           // 字符集
+	MaxIdleConns    int    `mapstructure:"max_idle_conns"`    // 最大空闲连接数
+	MaxOpenConns    int    `mapstructure:"max_open_conns"`    // 最大打开连接数
+	ConnMaxLifetime string `mapstructure:"conn_max_lifetime"` // 连接最大生存时间
+	LogLevel        string `mapstructure:"log_level"`         // 日志级别
+}
+
+// IDGenLeafConfig Leaf算法配置
+type IDGenLeafConfig struct {
+	DefaultStep      int32  `mapstructure:"default_step"`      // 默认步长
+	PreloadThreshold string `mapstructure:"preload_threshold"` // 预加载阈值
+	CleanupInterval  string `mapstructure:"cleanup_interval"`  // 清理间隔
+	MaxStepSize      int32  `mapstructure:"max_step_size"`     // 最大步长
+	MinStepSize      int32  `mapstructure:"min_step_size"`     // 最小步长
+	StepAdjustRatio  string `mapstructure:"step_adjust_ratio"` // 步长调整比例
+}
+
+// IDGenBizTag 业务标识配置
+type IDGenBizTag struct {
+	Step        int32  `mapstructure:"step"`        // 步长
+	Description string `mapstructure:"description"` // 描述
+	AutoCreate  bool   `mapstructure:"auto_create"` // 是否自动创建
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/qiaojinxia/distributed-service/framework/core"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,7 +11,6 @@ import (
 	"github.com/qiaojinxia/distributed-service/examples/http-grpc-test/client"
 	user "github.com/qiaojinxia/distributed-service/examples/http-grpc-test/proto"
 	"github.com/qiaojinxia/distributed-service/examples/http-grpc-test/service"
-	"github.com/qiaojinxia/distributed-service/framework"
 	"github.com/qiaojinxia/distributed-service/framework/logger"
 	"github.com/qiaojinxia/distributed-service/framework/transport/grpc"
 	"google.golang.org/grpc/status"
@@ -27,7 +27,7 @@ func main() {
 	log.Info(context.Background(), "🚀 启动HTTP + gRPC集成服务...")
 
 	// 同时启动HTTP和gRPC服务
-	err := framework.New().
+	err := core.New().
 		Port(8080).                // HTTP端口
 		Name("http-grpc-service"). // 服务名称
 		Version("v1.0.0").         // 版本

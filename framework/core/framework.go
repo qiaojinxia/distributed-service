@@ -1,7 +1,9 @@
-package framework
+package core
 
 import (
 	"github.com/qiaojinxia/distributed-service/framework/app"
+	"github.com/qiaojinxia/distributed-service/framework/cache"
+	idgen2 "github.com/qiaojinxia/distributed-service/framework/common/idgen"
 )
 
 // 🚀 分布式服务框架 - 主API
@@ -98,4 +100,71 @@ func Prod() error {
 // defaultRoutes 默认路由 - 提供基础的健康检查和信息接口
 func defaultRoutes(r interface{}) {
 	// 这里会在 transport/http 中实现
+}
+
+// ================================
+// 🆔 分布式ID服务
+// ================================
+
+// NewIDGenerator 创建分布式ID生成器
+//
+// 使用示例：
+//
+//	idGen, err := framework.NewIDGenerator(idgen.Config{
+//	  Type: "leaf",
+//	  TableName: "leaf_alloc",
+//	  Database: &idgen.DatabaseConfig{
+//	    Driver: "mysql",
+//	    Host: "localhost",
+//	    Port: 3306,
+//	    Database: "test",
+//	    Username: "root",
+//	    Password: "password",
+//	    Charset: "utf8mb4",
+//	  },
+//	})
+func NewIDGenerator(config idgen2.Config) (idgen2.IDGenerator, error) {
+	return idgen2.NewIDGeneratorFromConfig(config)
+}
+
+// ================================
+// 💾 缓存管理器
+// ================================
+
+// NewCacheManager 创建缓存管理器
+//
+// 使用示例：
+//
+//	manager := framework.NewCacheManager()
+//	manager.RegisterBuilder(cache.TypeMemory, &cache.MemoryBuilder{})
+//	manager.RegisterBuilder(cache.TypeRedis, &cache.RedisBuilder{})
+//
+//	// 创建内存缓存
+//	err := manager.CreateCache(cache.Config{
+//	  Type: cache.TypeMemory,
+//	  Name: "user_cache",
+//	  Settings: map[string]interface{}{
+//	    "max_size": 1000,
+//	    "default_ttl": "1h",
+//	  },
+//	})
+func NewCacheManager() *cache.Manager {
+	manager := cache.NewManager()
+
+	// 注册默认的缓存构建器
+	manager.RegisterBuilder(cache.TypeMemory, &cache.MemoryBuilder{})
+	manager.RegisterBuilder(cache.TypeRedis, &cache.RedisBuilder{})
+	manager.RegisterBuilder(cache.TypeHybrid, &cache.HybridBuilder{})
+
+	return manager
+}
+
+// GetDefaultCacheManager 获取默认缓存管理器实例
+var defaultCacheManager *cache.Manager
+
+func GetDefaultCacheManager() *cache.Manager {
+	if defaultCacheManager == nil {
+		defaultCacheManager = NewCacheManager()
+	}
+	return defaultCacheManager
 }

@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/qiaojinxia/distributed-service/framework/component"
 	"github.com/qiaojinxia/distributed-service/framework/logger"
 )
 
@@ -271,4 +272,36 @@ func (a *App) BeforeStop(fn func(context.Context) error) {
 // AfterStop 添加停止后回调
 func (a *App) AfterStop(fn func(context.Context) error) {
 	a.afterStop = append(a.afterStop, fn)
+}
+
+// GetComponentManager 获取组件管理器
+func (a *App) GetComponentManager() *component.Manager {
+	// 从组件列表中查找ComponentWrapper
+	for _, comp := range a.components {
+		if wrapper, ok := comp.(*ComponentWrapper); ok {
+			return wrapper.manager
+		}
+	}
+	return nil
+}
+
+// ComponentWrapper 组件管理器包装器接口
+type ComponentWrapper struct {
+	manager *component.Manager
+}
+
+func (c *ComponentWrapper) Name() string {
+	return "ComponentManager"
+}
+
+func (c *ComponentWrapper) Init(ctx context.Context) error {
+	return c.manager.Init(ctx)
+}
+
+func (c *ComponentWrapper) Start(ctx context.Context) error {
+	return c.manager.Start(ctx)
+}
+
+func (c *ComponentWrapper) Stop(ctx context.Context) error {
+	return c.manager.Stop(ctx)
 }

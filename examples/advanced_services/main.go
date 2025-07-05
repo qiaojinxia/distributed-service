@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
+	"github.com/qiaojinxia/distributed-service/framework/core"
 	"log"
 	"time"
 
-	"github.com/qiaojinxia/distributed-service/framework"
 	"github.com/qiaojinxia/distributed-service/framework/config"
 	httpTransport "github.com/qiaojinxia/distributed-service/framework/transport/http"
 	"github.com/qiaojinxia/distributed-service/pkg/etcd"
@@ -20,7 +20,7 @@ func main() {
 	log.Println("   包含：Redis Cluster + Kafka + Etcd")
 
 	// 使用新增的三个高级服务启动框架
-	err := framework.New().
+	err := core.New().
 		Port(8080).
 		Name("advanced-services-demo").
 		Version("v3.0.0").

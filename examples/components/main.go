@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"github.com/qiaojinxia/distributed-service/framework"
 	"github.com/qiaojinxia/distributed-service/framework/config"
+	"github.com/qiaojinxia/distributed-service/framework/core"
 	"log"
 )
 
@@ -11,11 +11,11 @@ func main() {
 	log.Println("🧩 启动组件化框架示例...")
 
 	// 使用选项模式配置各种组件
-	err := framework.New().
-		Port(8080).                   // 基础配置
-		Name("component-demo").       // 应用名称
-		Version("v1.0.0").            // 应用版本
-		Mode("debug").                // 开发模式
+	err := core.New().
+		Port(8080). // 基础配置
+		Name("component-demo"). // 应用名称
+		Version("v1.0.0"). // 应用版本
+		Mode("debug"). // 开发模式
 		Config("config/config.yaml"). // 配置文件
 
 		// 🗄️ 数据库组件配置
