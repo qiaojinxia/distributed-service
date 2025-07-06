@@ -62,6 +62,7 @@ func NewServer(cfg *Config) *Server {
 		middleware.HTTPLoggingMiddleware(),
 		middleware.HTTPCORSMiddleware(),
 		middleware.HTTPMetricsMiddleware(),
+		middleware.CacheMiddleware(), // 自动注入缓存服务
 	)
 
 	return &Server{

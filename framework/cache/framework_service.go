@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/qiaojinxia/distributed-service/framework/database"
+	"github.com/qiaojinxia/distributed-service/framework/logger"
 )
 
 // FrameworkCacheService 框架缓存服务，使用框架的Redis客户端
@@ -30,17 +31,80 @@ func NewFrameworkCacheService() *FrameworkCacheService {
 	return service
 }
 
-// Initialize 初始化缓存服务，使用框架的Redis客户端
+// Initialize 初始化缓存服务
 func (fcs *FrameworkCacheService) Initialize(ctx context.Context) error {
-	// 检查框架Redis客户端是否已初始化
-	if database.RedisClient == nil {
-		return fmt.Errorf("framework Redis client not initialized, please call database.InitRedis() first")
+	// 注册内存缓存构建器（始终可用）
+	fcs.Manager.RegisterBuilder(TypeMemory, &MemoryBuilder{})
+	fcs.Manager.RegisterBuilder("memory", &MemoryBuilder{})
+	
+	// 如果Redis客户端可用，注册Redis构建器
+	if database.RedisClient != nil {
+		fcs.Manager.RegisterBuilder(TypeRedis, NewSimpleRedisBuilder(database.RedisClient))
+		fcs.Manager.RegisterBuilder("redis", NewSimpleRedisBuilder(database.RedisClient))
+		logger.Info(ctx, "✅ Framework cache service initialized with Redis support")
+	} else {
+		logger.Warn(ctx, "⚠️ Redis client not available, using memory-only caching")
 	}
+	
+	// 注册混合缓存构建器
+	fcs.Manager.RegisterBuilder(TypeHybrid, &HybridBuilder{})
+	fcs.Manager.RegisterBuilder("hybrid", &HybridBuilder{})
 
-	// 注册Redis构建器，使用框架的Redis客户端
-	fcs.Manager.RegisterBuilder(TypeRedis, NewSimpleRedisBuilder(database.RedisClient))
-	fcs.Manager.RegisterBuilder("redis", NewSimpleRedisBuilder(database.RedisClient))
+	return nil
+}
 
+// CreateDefaultCaches 创建默认缓存实例（内存缓存）
+func (fcs *FrameworkCacheService) CreateDefaultCaches(ctx context.Context) error {
+	logger.Info(ctx, "🔧 Creating default memory-based caches...")
+	
+	// 默认缓存实例配置 - 使用time.Duration而非字符串
+	defaultCaches := map[string]map[string]interface{}{
+		"users": {
+			"max_size":         1000,
+			"eviction_policy":  "lru",
+			"default_ttl":      time.Hour * 2,       // 2小时
+			"cleanup_interval": time.Minute * 10,    // 10分钟
+		},
+		"sessions": {
+			"max_size":         500,
+			"eviction_policy":  "ttl", 
+			"default_ttl":      time.Minute * 30,    // 30分钟
+			"cleanup_interval": time.Minute * 5,     // 5分钟 - 恢复合理值
+		},
+		"products": {
+			"max_size":         2000,
+			"eviction_policy":  "simple",
+			"default_ttl":      time.Hour,           // 1小时
+			"cleanup_interval": time.Minute * 15,    // 15分钟 - 恢复合理值
+		},
+		"configs": {
+			"max_size":         100,
+			"eviction_policy":  "lru",
+			"default_ttl":      time.Hour * 24,      // 24小时
+			"cleanup_interval": time.Hour,           // 1小时
+		},
+	}
+	
+	// 创建默认缓存实例
+	for name, settings := range defaultCaches {
+		config := Config{
+			Type:     TypeMemory,
+			Name:     name,
+			Settings: settings,
+		}
+		
+		if err := fcs.Manager.CreateCache(config); err != nil {
+			logger.Error(ctx, "Failed to create default cache", 
+				logger.String("name", name), 
+				logger.Err(err))
+			continue
+		}
+		
+		logger.Info(ctx, "✅ Default cache created", 
+			logger.String("name", name), 
+			logger.String("type", "memory"))
+	}
+	
 	return nil
 }
 
@@ -139,6 +203,15 @@ func (fcs *FrameworkCacheService) GetStats() map[string]Stats {
 	}
 
 	return stats
+}
+
+// GetNamedCache 获取指定名称的缓存（包装版本）
+func (fcs *FrameworkCacheService) GetNamedCache(name string) (Cache, error) {
+	cache := fcs.Manager.GetNamedCache(name)
+	if cache == nil {
+		return nil, ErrCacheNotFound
+	}
+	return cache, nil
 }
 
 // CreateCacheWithFrameworkRedis 便捷函数：使用框架Redis创建缓存

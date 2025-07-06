@@ -994,6 +994,20 @@ func (m *Manager) initCache(ctx context.Context) error {
 				logger.String("name", name), 
 				logger.String("type", instanceCfg.Type))
 		}
+	} else {
+		// 如果没有配置或配置未启用，创建默认的内存缓存实例
+		logger.Info(ctx, "🔧 No cache config found, creating default memory caches...")
+		if err := m.cacheService.CreateDefaultCaches(ctx); err != nil {
+			logger.Warn(ctx, "Failed to create default caches", logger.Err(err))
+		}
+	}
+
+	// 注册缓存服务到全局系统，实现统一访问
+	if err := m.registerCacheToGlobalSystem(); err != nil {
+		logger.Warn(ctx, "Failed to register cache to global system", logger.Err(err))
+		// 不返回错误，因为这不是致命问题
+	} else {
+		logger.Info(ctx, "✅ Cache registered to global system")
 	}
 
 	logger.Info(ctx, "✅ Cache initialized")
@@ -1137,4 +1151,30 @@ func (m *Manager) IsInitialized() bool {
 // IsStarted 检查是否已启动
 func (m *Manager) IsStarted() bool {
 	return m.started
+}
+
+// ================================
+// 🔗 全局系统集成
+// ================================
+
+// CacheRegistryCallback 缓存注册回调函数类型
+type CacheRegistryCallback func(*cache.FrameworkCacheService) error
+
+// globalCacheRegistryCallback 全局缓存注册回调
+var globalCacheRegistryCallback CacheRegistryCallback
+
+// SetCacheRegistryCallback 设置缓存注册回调（由core包调用）
+func SetCacheRegistryCallback(callback CacheRegistryCallback) {
+	globalCacheRegistryCallback = callback
+}
+
+// registerCacheToGlobalSystem 注册缓存服务到全局系统
+func (m *Manager) registerCacheToGlobalSystem() error {
+	if globalCacheRegistryCallback == nil {
+		return fmt.Errorf("cache registry callback not set")
+	}
+	if m.cacheService == nil {
+		return fmt.Errorf("cache service not initialized")
+	}
+	return globalCacheRegistryCallback(m.cacheService)
 }

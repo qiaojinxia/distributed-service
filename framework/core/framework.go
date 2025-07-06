@@ -4,7 +4,13 @@ import (
 	"github.com/qiaojinxia/distributed-service/framework/app"
 	"github.com/qiaojinxia/distributed-service/framework/cache"
 	idgen2 "github.com/qiaojinxia/distributed-service/framework/common/idgen"
+	"github.com/qiaojinxia/distributed-service/framework/component"
 )
+
+// 包初始化时设置缓存注册回调
+func init() {
+	component.SetCacheRegistryCallback(initGlobalCacheSystem)
+}
 
 // 🚀 分布式服务框架 - 主API
 
@@ -128,26 +134,26 @@ func NewIDGenerator(config idgen2.Config) (idgen2.IDGenerator, error) {
 }
 
 // ================================
-// 💾 缓存管理器
+// 💾 统一缓存系统
 // ================================
 
-// NewCacheManager 创建缓存管理器
+// frameworkCacheService 框架缓存服务实例
+var frameworkCacheService *cache.FrameworkCacheService
+
+// initGlobalCacheSystem 初始化全局缓存系统（内部使用）
+func initGlobalCacheSystem(fcs *cache.FrameworkCacheService) error {
+	frameworkCacheService = fcs
+	return nil
+}
+
+// NewCacheManager 创建缓存管理器（已废弃，使用 GetCache 系列方法）
 //
-// 使用示例：
+// 推荐使用：
+//   - GetCache(name) - 获取命名缓存
+//   - GetUserCache() - 获取用户缓存
+//   - GetSessionCache() - 获取会话缓存
 //
-//	manager := framework.NewCacheManager()
-//	manager.RegisterBuilder(cache.TypeMemory, &cache.MemoryBuilder{})
-//	manager.RegisterBuilder(cache.TypeRedis, &cache.RedisBuilder{})
-//
-//	// 创建内存缓存
-//	err := manager.CreateCache(cache.Config{
-//	  Type: cache.TypeMemory,
-//	  Name: "user_cache",
-//	  Settings: map[string]interface{}{
-//	    "max_size": 1000,
-//	    "default_ttl": "1h",
-//	  },
-//	})
+// Deprecated: 使用新的统一缓存API
 func NewCacheManager() *cache.Manager {
 	manager := cache.NewManager()
 
@@ -159,12 +165,60 @@ func NewCacheManager() *cache.Manager {
 	return manager
 }
 
-// GetDefaultCacheManager 获取默认缓存管理器实例
-var defaultCacheManager *cache.Manager
+// ================================
+// 🎯 简化缓存访问API
+// ================================
 
-func GetDefaultCacheManager() *cache.Manager {
-	if defaultCacheManager == nil {
-		defaultCacheManager = NewCacheManager()
+// GetCache 获取指定名称的缓存（推荐使用）
+//
+// 使用示例：
+//
+//	userCache := framework.GetCache("users")
+//	if userCache != nil {
+//	  userCache.Set(ctx, "key", "value", time.Hour)
+//	}
+func GetCache(name string) cache.Cache {
+	if frameworkCacheService == nil {
+		return nil
 	}
-	return defaultCacheManager
+	c, _ := frameworkCacheService.GetNamedCache(name)
+	return c
+}
+
+// GetUserCache 获取用户缓存
+func GetUserCache() cache.Cache {
+	return GetCache("users")
+}
+
+// GetSessionCache 获取会话缓存
+func GetSessionCache() cache.Cache {
+	return GetCache("sessions")
+}
+
+// GetProductCache 获取产品缓存
+func GetProductCache() cache.Cache {
+	return GetCache("products")
+}
+
+// GetConfigCache 获取配置缓存
+func GetConfigCache() cache.Cache {
+	return GetCache("configs")
+}
+
+// HasCache 检查指定缓存是否存在
+func HasCache(name string) bool {
+	return GetCache(name) != nil
+}
+
+// GetCacheStats 获取缓存统计信息
+func GetCacheStats(name string) (*cache.Stats, error) {
+	c := GetCache(name)
+	if c == nil {
+		return nil, cache.ErrCacheNotFound
+	}
+	if statsCache, ok := c.(cache.StatsCache); ok {
+		stats := statsCache.GetStats()
+		return &stats, nil
+	}
+	return nil, cache.ErrStatsNotSupported
 }

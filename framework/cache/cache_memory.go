@@ -23,9 +23,9 @@ const (
 
 type MemoryCache struct {
 	// 使用现成的库实现不同的淘汰策略
-	lruCache    *lru.Cache[string, interface{}]     // LRU策略
-	expireCache *expirable.LRU[string, interface{}] // TTL策略
-	goCache     *gocache.Cache                      // 支持TTL的简单缓存
+	lruCache    *lru.Cache[string, interface{}]     // LRU策略  
+	expireCache *expirable.LRU[string, interface{}] // 预留字段（未使用）
+	goCache     *gocache.Cache                      // TTL策略和Simple策略共用
 
 	// 配置
 	config    MemoryConfig
@@ -71,11 +71,11 @@ func NewMemoryCache(config MemoryConfig) (*MemoryCache, error) {
 		mc.lruCache = lruCache
 
 	case EvictionPolicyTTL:
-		mc.expireCache = expirable.NewLRU[string, interface{}](
-			config.MaxSize,
-			mc.onExpirableEvicted,
-			config.DefaultTTL,
-		)
+		// TTL策略使用goCache，因为它支持每个键的自定义TTL
+		mc.goCache = gocache.New(config.DefaultTTL, config.CleanupInterval)
+		if mc.onEvicted != nil {
+			mc.goCache.OnEvicted(mc.onEvicted)
+		}
 
 	case EvictionPolicySimple:
 		mc.goCache = gocache.New(config.DefaultTTL, config.CleanupInterval)
@@ -129,11 +129,11 @@ func (m *MemoryCache) Get(ctx context.Context, key string) (interface{}, error) 
 		return value, nil
 
 	case EvictionPolicyTTL:
-		if m.expireCache == nil {
+		if m.goCache == nil {
 			return nil, ErrKeyNotFound
 		}
-		value, ok := m.expireCache.Get(key)
-		if !ok {
+		value, found := m.goCache.Get(key)
+		if !found {
 			m.mutex.Lock()
 			m.stats.Misses++
 			m.mutex.Unlock()
@@ -178,15 +178,16 @@ func (m *MemoryCache) Set(ctx context.Context, key string, value interface{}, ex
 		return nil
 
 	case EvictionPolicyTTL:
-		if m.expireCache == nil {
+		// TTL策略实际上应该使用支持每个键自定义TTL的goCache
+		// expirable.LRU 只支持固定TTL，不适合灵活的TTL需求
+		if m.goCache == nil {
 			return fmt.Errorf("TTL cache not initialized")
 		}
 		ttl := expiration
 		if ttl <= 0 {
 			ttl = m.config.DefaultTTL
 		}
-		// 如果需要不同的TTL，需要使用 AddWithTTL 方法
-		m.expireCache.Add(key, value)
+		m.goCache.Set(key, value, ttl)
 		m.mutex.Lock()
 		m.stats.Sets++
 		m.mutex.Unlock()
@@ -218,8 +219,8 @@ func (m *MemoryCache) Delete(ctx context.Context, key string) error {
 			m.lruCache.Remove(key)
 		}
 	case EvictionPolicyTTL:
-		if m.expireCache != nil {
-			m.expireCache.Remove(key)
+		if m.goCache != nil {
+			m.goCache.Delete(key)
 		}
 	case EvictionPolicySimple:
 		if m.goCache != nil {
@@ -243,10 +244,11 @@ func (m *MemoryCache) Exists(ctx context.Context, key string) (bool, error) {
 		return m.lruCache.Contains(key), nil
 
 	case EvictionPolicyTTL:
-		if m.expireCache == nil {
+		if m.goCache == nil {
 			return false, nil
 		}
-		return m.expireCache.Contains(key), nil
+		_, found := m.goCache.Get(key)
+		return found, nil
 
 	case EvictionPolicySimple:
 		if m.goCache == nil {
@@ -267,8 +269,8 @@ func (m *MemoryCache) Clear(ctx context.Context) error {
 			m.lruCache.Purge()
 		}
 	case EvictionPolicyTTL:
-		if m.expireCache != nil {
-			m.expireCache.Purge()
+		if m.goCache != nil {
+			m.goCache.Flush()
 		}
 	case EvictionPolicySimple:
 		if m.goCache != nil {
